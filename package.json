@@ -1,0 +1,29 @@
+{
+  "name": "local-resource-manager",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "description": "Hello World!",
+  "main": "main.cjs",
+  "author": "XHY",
+  "license": "MIT",
+  "scripts": {
+    "vue-dev": "vite",
+    "vue-build": "vite build",
+    "vue-preview": "vite preview",
+    "electron-start": "electron .",
+    "electron-test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "vue": "^3.5.22"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "electron": "^39.1.2",
+    "vite": "^7.1.11",
+    "vite-plugin-vue-devtools": "^8.0.3"
+  }
+}
