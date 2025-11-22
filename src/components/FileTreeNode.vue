@@ -3,11 +3,17 @@
     <div class="file-tree-container">
          <!-- 当前节点 -->
         <div style="padding-left:20px" class="tree-node">
-            <div @click="vueOpenDir" class="node-header">
+            <div  class="node-header">
                 <p >
                 <span v-if="node.isDir">{{ dirIsOpen ? '📂' : '📁' }}</span>
-                <span >{{ node.name }}</span>
-                <button @click="onGetId" style="margin-left: 10px;">查看详细</button>
+                <span @click="vueOpenDir">{{ node.name }}</span>
+                <!-- 只有特定类型的文件才显示信息按钮 -->
+                <button 
+                    v-if="!node.isDir && isSupportFileType(node.ext)" 
+                    @click="vueGetFileInfo" 
+                    style="margin-left: 10px;">
+                    信息
+                </button>
                 </p>
             </div>
 
@@ -49,6 +55,14 @@ const props = defineProps({
 const dirIsOpen = ref(false)
 const dirIsScan = ref(false)
 
+// 支持的文件类型列表
+const supportFileTypeList = ['mp4', 'jpg', 'png' ];
+
+// 判断是否为支持的文件类型
+const isSupportFileType = (ext) => {
+    return supportFileTypeList.includes(ext.toLowerCase());
+}
+
 // 打开目录
 const vueOpenDir = async function () {
     // 如果还没有加载过，则进行加载
@@ -64,12 +78,10 @@ const vueOpenDir = async function () {
 }
 
 // 获取节点ID并向上发送事件
-const onGetId = () => {
+const vueGetFileInfo = () => {
     // 向父组件发送节点信息
     emit('node-selected', props.node)
 }
-
-console.log('FileTreeNode.vue 已加载')
 </script>
 
 <style scoped>

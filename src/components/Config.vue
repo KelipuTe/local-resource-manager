@@ -2,8 +2,10 @@
     <div>
         <div>设置</div>
         <div>
-            <input v-model="dirPath" placeholder="请选择目录" readonly></input>
-            <button @click="vueSelectDir">请选择目录</button>
+            <p>
+                <input v-model="dirPath" placeholder="选择的目录" readonly></input>
+                <button @click="vueSelectDir">请选择目录</button>
+            </p>
         </div>
     </div>
 </template>
@@ -30,6 +32,4 @@ const vueSelectDir = async () => {
         console.error('vueSelectDir Error', err)
     }
 }
-
-console.log('Config.vue 已加载')
 </script>
