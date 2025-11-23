@@ -21,7 +21,7 @@
                     <p><strong>全路径:</strong> {{ beSelectNode.path }}</p>
                     
                     <!-- 预览区域 -->
-                    <div v-if="isPreviewableFile(beSelectNode)" style="margin-bottom: 20px;">
+                    <div v-if="isCanPreviewFile(beSelectNode)" style="margin-bottom: 20px;">
                         <h3>预览</h3>
                         <div style="max-width: 100%; max-height: 400px; overflow: auto;">
                             <!-- 图片预览 -->
@@ -83,22 +83,20 @@ const beSelectNode = ref(null)
 
 const fileInfoDefault = {
     id: 0,
-    filename: '0', // 文件名
-    filetype: '0', // 文件后缀名
-    source: '0', // 资源的来源。bilibili。
-    source_id: '0', // 资源的原始id
-    source_num: 1, // 资源的编号。有些资源会共用原始id。
-    source_name: '0', // 资源的名称
-    source_ext_info: '0', // 额外的资源信息
-    user_id: '0', // 资源所属的用户的id
-    user_name: '0', // 资源所属的用户的名称
-    user_ext_info: '0', // 额外的用户信息。比如：用户A剪辑的用户B的录播视频。
-    publish_at: '0', // 资源发布时间
-    key_point: '0', // 资源的关键点是什么。画面；声音；文字。
-    summary: '0', // 我写的总结。主要是和【Obsidian】那边的笔记联动用的。
-    status: 1, // 资源的状态。1=本地有。
-    visit_at: 'CURRENT_TIMESTAMP', // 最后一次访问时间
-    visit_times: 1, // 访问次数
+    filename: '0',
+    filetype: '0',
+    source: '0',
+    resource_id: '0',
+    index: 1,
+    user_id: '0',
+    resource_name: '0',
+    ext_info: '0',
+    publish_at: '0',
+    key_point: '0',
+    summary: '0',
+    status: 1,
+    visit_at: 'CURRENT_TIMESTAMP',
+    visit_times: 1,
     create_at: 'CURRENT_TIMESTAMP',
     update_at: 'CURRENT_TIMESTAMP',
 }
@@ -120,35 +118,37 @@ const fileInfoKeyNameMap = {
     id: 'ID',
     filename: '文件名',
     filetype: '文件类型',
-    source: '来源',
-    source_id: '来源ID',
-    source_num: '来源编号',
-    source_name: '来源名称',
-    source_ext_info: '来源额外信息',
-    user_id: '用户ID',
-    user_name: '用户名',
-    user_ext_info: '用户额外信息',
-    publish_at: '发布时间',
-    key_point: '关键点',
-    summary: '总结',
-    status: '状态',
-    visit_at: '最后访问时间',
-    visit_times: '访问次数',
+    source: '资源的来源',
+    resource_id: '资源的id',
+    index: '下标',
+    user_id: '资源所属用户的id',
+    username: '资源所属用户的名称',
+    user_ext_info: '资源所属用户的额外信息',
+    resource_name: '资源的名称',
+    ext_info: '资源的额外信息',
+    publish_at: '资源的发布时间',
+    key_point: '我认为资源的重点是什么',
+    summary: '我对资源的总结',
+    status: '资源的状态',
+    visit_at: '我最后一次访问资源的时间',
+    visit_times: '我访问资源的总次数',
     create_at: '创建时间',
-    update_at: '更新时间'
+    update_at: '修改时间'
 }
 // 获取字段标签的方法
 const vueGetFileInfoKeyName = (key) => {
     return fileInfoKeyNameMap[key] || key;
 }
 
-// 支持预览的文件类型
-const previewableExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'mp4', 'webm', 'ogg', 'avi'];
+// 可以预览的文件类型
+const canPreviewExtList = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'mp4', 'webm', 'ogg', 'avi'];
 
-// 判断是否为可预览文件
-const isPreviewableFile = (node) => {
-    if (!node || node.isDir) return false;
-    return previewableExtensions.includes(node.ext?.toLowerCase());
+// 判断是否为可以预览的文件
+const isCanPreviewFile = (node) => {
+    if (!node || node.isDir) {
+        return false;
+    }
+    return canPreviewExtList.includes(node.ext?.toLowerCase());
 };
 
 // 判断是否为图片文件

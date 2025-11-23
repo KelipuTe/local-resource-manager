@@ -23,13 +23,13 @@ const vueSelectDir = async () => {
                 message: '请选择目录'
             }
         )
-        console.log('vueSelectDir result', result)
+        console.log('vueSelectDir-result', result)
         if (result !== '') {
             localStorage.setItem('dirPath', result)
             dirPath.value = result
         }
     } catch (err) {
-        console.error('vueSelectDir Error', err)
+        console.error('vueSelectDir-Error', err)
     }
 }
 </script>

@@ -1,6 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-
 contextBridge.exposeInMainWorld('api', {
     ipcSelectDir: (options) => ipcRenderer.invoke('ipcSelectDir', options),
     ipcScanDir: (path) => ipcRenderer.invoke('ipcScanDir', path),

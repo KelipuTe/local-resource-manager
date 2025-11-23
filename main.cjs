@@ -1,8 +1,6 @@
 const { app, BrowserWindow } = require('electron/main');
-const { ipcMain, dialog } = require('electron/main');
-const fs = require('fs/promises');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
+const { setMainWindow, registerIpcHandler } = require('./ipcHandlers.cjs');
 
 let mainWindow;
 
@@ -11,223 +9,20 @@ const createWindow = () => {
         width: 1600,
         height: 900,
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, 'preload.cjs'),
             webSecurity: false // 添加此行以禁用同源策略限制
         }
     });
     mainWindow.webContents.openDevTools(); // 开启调试工具
     mainWindow.loadURL('http://localhost:5173');
+    
+    // 设置主窗口引用
+    setMainWindow(mainWindow);
 };
-
-// ---------------- SQLite ----------------
-
-let db;
-let dbPath = 'D:\\不知道什么时候会有用的仓库\\比较大的资源放外面\\resource.db';
-
-db = new sqlite3.Database(
-    dbPath,
-    (err) => {
-        if (err != null) {
-            console.error('sqlite3.Database', err.message);
-        }
-    }
-);
-
-// 这东西就是写在这里，方便看【resource 表】的数据结构用的
-const resourceModel = {
-    id: 0,
-    filename: '0', // 文件名
-    filetype: '0', // 文件后缀名
-    source: '0', // 资源的来源。bilibili。
-    source_id: '0', // 资源的原始id
-    source_num: 1, // 资源的编号。有些资源会共用原始id。
-    source_name: '0', // 资源的名称
-    source_ext_info: '0', // 额外的资源信息
-    user_id: '0', // 资源所属的用户的id
-    user_name: '0', // 资源所属的用户的名称
-    user_ext_info: '0', // 额外的用户信息。比如：用户A剪辑的用户B的录播视频。
-    publish_at: '0', // 资源发布时间
-    key_point: '0', // 资源的关键点是什么。画面；声音；文字。
-    summary: '0', // 我写的总结。主要是和【Obsidian】那边的笔记联动用的。
-    status: 1, // 资源的状态。1=本地有。
-    visit_at: 'CURRENT_TIMESTAMP', // 最后一次访问时间
-    visit_times: 1, // 访问次数
-    create_at: 'CURRENT_TIMESTAMP',
-    update_at: 'CURRENT_TIMESTAMP',
-};
-
-function selectFileInfo(filename) {
-    const sql = `SELECT * FROM \`resource\` where filename = ?`;
-    const basename = filename.split('.').slice(0, -1).join('.');
-    console.log(sql, basename);
-
-    return new Promise(
-        (resolve, reject) => {
-            db.get(
-                sql,
-                [basename],
-                (err, row) => {
-                    if (err != null) {
-                        console.error('queryFileInfo', err.message);
-                        reject(err.message);
-                    } else {
-                        resolve(row);
-                    }
-                }
-            );
-        }
-    );
-}
-
-function insertFileInfo(model) {
-    // 排除自增主键id和不需要更新的字段
-    const { id, visit_at, visit_times, create_at, update_at, ...insertData } = model;
-
-    // 构造插入语句
-    const keys = Object.keys(insertData);
-    const placeholders = keys.map(() => '?').join(', ');
-    const sql = `INSERT INTO \`resource\` (${keys.join(', ')}) VALUES (${placeholders})`;
-
-    console.log(sql, insertData);
-
-    return new Promise(
-        (resolve, reject) => {
-            db.run(
-                sql,
-                Object.values(insertData),
-                function (err) {
-                    if (err) {
-                        console.error('insertFileInfo', err.message);
-                        reject(err.message);
-                    } else {
-                        resolve({ id: this.lastID });
-                    }
-                }
-            );
-        }
-    );
-}
-
-function updateFileInfo(model) {
-    // 排除主键id和不需要更新的字段
-    const { id, visit_at, visit_times, create_at, update_at, ...updateData } = model;
-
-    // 构造更新语句
-    const keys = Object.keys(updateData);
-    const setClause = keys.map(key => `${key} = ?`).join(', ');
-    const sql = `UPDATE \`resource\` SET ${setClause} WHERE id = ?`;
-
-    console.log(sql, updateData, id);
-
-    return new Promise(
-        (resolve, reject) => {
-            const values = [...Object.values(updateData), id];
-            db.run(
-                sql,
-                values,
-                function (err) {
-                    if (err) {
-                        console.error('updateFileInfo', err.message);
-                        reject(err.message);
-                    } else {
-                        resolve({ changes: this.changes });
-                    }
-                }
-            );
-        }
-    );
-}
-
-// -------------------------------- SQLite --------------------------------
-
-// ---------------- IPC ----------------
-
-// 选择目录
-async function nodejsSelectDir(_, options) {
-    let returnData = '';
-    const result = await dialog.showOpenDialog(
-        mainWindow,
-        {
-            properties: ['openDirectory'],
-            ...options
-        }
-    );
-    if (!result.canceled && result.filePaths.length > 0) {
-        returnData = result.filePaths[0];
-    }
-    return returnData;
-}
-
-// 扫描目录
-async function nodejsScanDir(_, dirPath) {
-    const returnData = [];
-    try {
-        // result，列表，目标目录下的文件和目录
-        const result = await fs.readdir(dirPath, { withFileTypes: true });
-        for (item of result) {
-            // 提取文件扩展名（如果是文件）
-            let ext = '';
-            if (!item.isDirectory()) {
-                const extIndex = item.name.lastIndexOf('.');
-                if (extIndex > 0) {
-                    ext = item.name.substring(extIndex + 1);
-                }
-            }
-            
-            returnData.push({
-                name: item.name,
-                ext: ext, // 文件扩展名
-                path: path.join(dirPath, item.name),
-                isDir: item.isDirectory(),
-                children: item.isDirectory() ? [] : null,
-                childrenIsLoad: false
-            });
-        }
-    } catch (err) {
-        console.error('nodejsScanDir', err);
-    }
-    return returnData;
-}
-
-// 查询文件信息
-async function nodejsQueryFileInfo(_, filename) {
-    let returnData = { ...resourceModel };
-    try {
-        result = await selectFileInfo(filename);
-        console.log('nodejsQueryFileInfo', result);
-        if (result != null && result!= undefined) {
-            returnData = { ...returnData, ...result };
-        }
-    } catch (err) {
-        console.error('nodejsQueryFileInfo', err);
-    }
-    return returnData;
-}
-
-// 保存文件信息（不存在就插入，存在就修改）
-async function nodejsSaveFileInfo(_, model) {
-    console.log(model);
-    let returnData = { ...resourceModel };
-    try {
-        if (model.id == 0) {
-            returnData = await insertFileInfo(model);
-        } else {
-            returnData = await updateFileInfo(model);
-        }
-    } catch (err) {
-        console.error('nodejsQueryFileInfo', err);
-    }
-    return returnData;
-}
-
-// -------------------------------- IPC --------------------------------
 
 app.whenReady().then(() => {
-    // IPC
-    ipcMain.handle('ipcSelectDir', nodejsSelectDir);
-    ipcMain.handle('ipcScanDir', nodejsScanDir);
-    ipcMain.handle('ipcQueryFileInfo', nodejsQueryFileInfo);
-    ipcMain.handle('ipcSaveFileInfo', nodejsSaveFileInfo);
+    // 注册IPC处理器
+    registerIpcHandler();
 
     createWindow();
 
@@ -249,3 +44,223 @@ app.on(
         }
     }
 );
+
+// // ---------------- SQLite ----------------
+
+// let db;
+// let dbPath = 'D:\\不知道什么时候会有用的仓库\\比较大的资源放外面\\resource.db';
+
+// db = new sqlite3.Database(dbPath, (err) => {
+//     if (err != null) {
+//         console.error('sqlite3.Database', err.message);
+//     }
+// });
+
+// const resourceModel = {
+//     id: 0,
+//     filename: '0',
+//     filetype: '0',
+//     source: '0',
+//     resource_id: '0',
+//     index: 1,
+//     user_id: '0',
+//     resource_name: '0',
+//     ext_info: '0',
+//     publish_at: '0',
+//     key_point: '0',
+//     summary: '0',
+//     status: 1,
+//     visit_at: 'CURRENT_TIMESTAMP',
+//     visit_times: 1,
+//     create_at: 'CURRENT_TIMESTAMP',
+//     update_at: 'CURRENT_TIMESTAMP',
+// };
+
+// const createByModel = {
+//     id: 0,
+//     source: '0',
+//     user_id: '0',
+//     username: '0',
+//     ext_info: '0',
+//     same_as: '0',
+//     create_at: 'CURRENT_TIMESTAMP',
+//     update_at: 'CURRENT_TIMESTAMP',
+// };
+
+
+// /** 返回【单个对象】或者【undefined】 */
+// async function selectFileInfo(filename) {
+//     const sql = `
+//         SELECT r.*, 
+//                c.username as username,
+//                c.ext_info as user_ext_info
+//         FROM resource as r LEFT JOIN create_by c ON r.user_id = c.user_id AND r.source = c.source
+//         WHERE r.filename = ?
+//     `;
+//     const basename = filename.split('.').slice(0, -1).join('.');
+//     const valueList = [basename];
+//     console.log(sql, valueList);
+
+//     return new Promise((resolve, reject) => {
+//         db.get(sql, valueList, (err, row) => {
+//             if (err != null) {
+//                 console.error('queryFileInfo', err.message);
+//                 reject(err.message);
+//             } else {
+//                 resolve(row);
+//             }
+//         });
+//     });
+// }
+
+// function insertFileInfo(model) {
+//     // 排除自增主键id和不需要更新的字段
+//     const { id, visit_at, visit_times, create_at, update_at, username, user_ext_info, ...insertData } = model;
+
+//     const keyList = Object.keys(insertData);
+//     const placeholders = keyList.map(() => { return '?'; }).join(', ');
+//     const sql = `INSERT INTO \`resource\` (${keyList.join(', ')}) VALUES (${placeholders})`;
+
+//     console.log(sql, insertData);
+
+//     return new Promise((resolve, reject) => {
+//         db.serialize(() => {
+//             db.run('BEGIN TRANSACTION');
+
+//             // 插入resource表
+//             db.run(sql, Object.values(insertData), function (err) {
+//                 if (err) {
+//                     console.error('insertFileInfo - resource insert', err.message);
+//                     db.run('ROLLBACK');
+//                     reject(err.message);
+//                     return;
+//                 }
+
+//                 const resourceId = this.lastID;
+
+//                 // 处理create_by表
+//                 handleCreateByRecord(model)
+//                     .then(() => {
+//                         db.run('COMMIT');
+//                         resolve({ id: resourceId });
+//                     })
+//                     .catch(handleErr => {
+//                         console.error('insertFileInfo - create_by handle', handleErr);
+//                         db.run('ROLLBACK');
+//                         reject(handleErr);
+//                     });
+//             });
+//         });
+//     });
+// }
+
+// function getNowDateTime() {
+//     const now = new Date();
+
+//     // 月份从 0 开始
+//     const year = now.getFullYear();
+//     const month = String(now.getMonth() + 1).padStart(2, '0');
+//     const day = String(now.getDate()).padStart(2, '0');
+//     const hours = String(now.getHours()).padStart(2, '0');
+//     const minutes = String(now.getMinutes()).padStart(2, '0');
+//     const seconds = String(now.getSeconds()).padStart(2, '0');
+
+//     return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+// }
+
+// function updateFileInfo(model) {
+//     // 排除主键id和不需要更新的字段
+//     const { id, visit_at, visit_times, create_at, update_at, ...updateData } = model;
+
+//     const keys = Object.keys(updateData);
+//     const setClause = keys.map(key => `${key} = ?`).join(', ');
+//     const sql = `UPDATE \`resource\` SET ${setClause} WHERE id = ?`;
+//     model.update_at = getNowDateTime();
+//     const values = [...Object.values(updateData), id];
+
+//     console.log(sql, values);
+
+//     return new Promise((resolve, reject) => {
+//         db.serialize(() => {
+//             // 开始事务
+//             db.run('BEGIN TRANSACTION');
+
+//             // 更新resource表
+
+//             db.run(sql, values, function (err) {
+//                 if (err) {
+//                     console.error('updateFileInfo - resource update', err.message);
+//                     db.run('ROLLBACK');
+//                     reject(err.message);
+//                     return;
+//                 }
+
+//                 // 处理create_by表
+//                 handleCreateByRecord(model)
+//                     .then(() => {
+//                         db.run('COMMIT');
+//                         resolve({ changes: this.changes });
+//                     })
+//                     .catch(handleErr => {
+//                         console.error('updateFileInfo - create_by handle', handleErr);
+//                         db.run('ROLLBACK');
+//                         reject(handleErr);
+//                     });
+//             });
+//         });
+//     });
+// }
+
+// // -------------------------------- SQLite --------------------------------
+
+// // 新增函数：处理create_by表记录
+// function handleCreateByRecord(model) {
+//     const { source, user_id, user_name } = model;
+
+//     // 如果缺少必要字段，跳过处理
+//     if (!source || !user_id || !user_name) {
+//         return Promise.resolve();
+//     }
+
+//     return new Promise((resolve, reject) => {
+//         // 根据source和user_id查询记录
+//         const selectSql = 'SELECT * FROM `create_by` WHERE source = ? AND user_id = ?';
+
+//         db.get(selectSql, [source, user_id], (err, row) => {
+//             if (err) {
+//                 console.error('handleCreateByRecord - select', err.message);
+//                 reject(err.message);
+//                 return;
+//             }
+
+//             if (row) {
+//                 // 记录存在，更新数据
+//                 let newExtInfo = row.user_name;
+//                 if (row.ext_info) {
+//                     newExtInfo = row.ext_info + ', ' + row.user_name;
+//                 }
+
+//                 const updateSql = 'UPDATE `create_by` SET user_name = ?, ext_info = ?, update_at = CURRENT_TIMESTAMP WHERE id = ?';
+//                 db.run(updateSql, [user_name, newExtInfo, row.id], (updateErr) => {
+//                     if (updateErr) {
+//                         console.error('handleCreateByRecord - update', updateErr.message);
+//                         reject(updateErr.message);
+//                         return;
+//                     }
+//                     resolve();
+//                 });
+//             } else {
+//                 // 记录不存在，新增记录
+//                 const insertSql = 'INSERT INTO `create_by` (source, user_id, user_name, create_at, update_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+//                 db.run(insertSql, [source, user_id, user_name], (insertErr) => {
+//                     if (insertErr) {
+//                         console.error('handleCreateByRecord - insert', insertErr.message);
+//                         reject(insertErr.message);
+//                         return;
+//                     }
+//                     resolve();
+//                 });
+//             }
+//         });
+//     });
+// }
