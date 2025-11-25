@@ -21,7 +21,7 @@ const createByModel = {
 };
 
 // 新增函数：处理create_by表记录
-function handleCreateByRecord(model) {
+function saveCreateByInfo(model) {
     const { source, user_id, user_name } = model;
 
     // 如果缺少必要字段，跳过处理
@@ -73,6 +73,6 @@ function handleCreateByRecord(model) {
 }
 
 module.exports = {
-    handleCreateByRecord,
+    saveCreateByInfo: saveCreateByInfo,
     createByModel
 };

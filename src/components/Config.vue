@@ -3,7 +3,7 @@
         <div>设置</div>
         <div>
             <p>
-                <input v-model="dirPath" placeholder="选择的目录" readonly></input>
+                <input v-model="rootPath" placeholder="选择的目录" readonly></input>
                 <button @click="vueSelectDir">请选择目录</button>
             </p>
         </div>
@@ -13,7 +13,7 @@
 <script setup>
 import { ref } from 'vue'
 
-const dirPath = ref('')
+const rootPath = ref('')
 
 const vueSelectDir = async () => {
     try {
@@ -23,13 +23,13 @@ const vueSelectDir = async () => {
                 message: '请选择目录'
             }
         )
-        console.log('vueSelectDir-result', result)
-        if (result !== '') {
-            localStorage.setItem('dirPath', result)
-            dirPath.value = result
+        console.log('vueSelectDir', result)
+        if (result != '') {
+            localStorage.setItem('rootPath', result)
+            rootPath.value = result
         }
     } catch (err) {
-        console.error('vueSelectDir-Error', err)
+        console.error('vueSelectDir', err)
     }
 }
 </script>

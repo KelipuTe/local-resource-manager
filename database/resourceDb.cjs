@@ -1,11 +1,14 @@
-const sqlite3 = require('sqlite3').verbose();
-const { handleCreateByRecord } = require('./createByDb.cjs');
-const { getNowDateTime } = require('../utils/helpers.cjs');
 
-let db;
-let dbPath = 'D:\\不知道什么时候会有用的仓库\\比较大的资源放外面\\resource.db';
+const { saveCreateByInfo } = require('./createByDb.cjs');
+const { getNowDateTime } = require('../util/helper.cjs');
 
-const resourceModel = {
+let dbConn;
+
+function dbSetDbConn(conn) {
+    dbConn = conn;
+}
+
+const dbResourceModel = {
     id: 0,
     filename: '0',
     filetype: '0',
@@ -25,12 +28,6 @@ const resourceModel = {
     update_at: 'CURRENT_TIMESTAMP',
 };
 
-db = new sqlite3.Database(dbPath, (err) => {
-    if (err != null) {
-        console.error('sqlite3.Database', err.message);
-    }
-});
-
 /** 返回【单个对象】或者【undefined】 */
 async function selectFileInfo(filename) {
     const sql = `
@@ -45,7 +42,7 @@ async function selectFileInfo(filename) {
     console.log(sql, valueList);
 
     return new Promise((resolve, reject) => {
-        db.get(sql, valueList, (err, row) => {
+        dbConn.get(sql, valueList, (err, row) => {
             if (err != null) {
                 console.error('queryFileInfo', err.message);
                 reject(err.message);
@@ -67,14 +64,14 @@ function insertFileInfo(model) {
     console.log(sql, insertData);
 
     return new Promise((resolve, reject) => {
-        db.serialize(() => {
-            db.run('BEGIN TRANSACTION');
+        dbConn.serialize(() => {
+            dbConn.run('BEGIN TRANSACTION');
 
             // 插入resource表
-            db.run(sql, Object.values(insertData), function (err) {
+            dbConn.run(sql, Object.values(insertData), function (err) {
                 if (err) {
                     console.error('insertFileInfo - resource insert', err.message);
-                    db.run('ROLLBACK');
+                    dbConn.run('ROLLBACK');
                     reject(err.message);
                     return;
                 }
@@ -82,14 +79,14 @@ function insertFileInfo(model) {
                 const resourceId = this.lastID;
 
                 // 处理create_by表
-                handleCreateByRecord(model)
+                saveCreateByInfo(model)
                     .then(() => {
-                        db.run('COMMIT');
+                        dbConn.run('COMMIT');
                         resolve({ id: resourceId });
                     })
                     .catch(handleErr => {
                         console.error('insertFileInfo - create_by handle', handleErr);
-                        db.run('ROLLBACK');
+                        dbConn.run('ROLLBACK');
                         reject(handleErr);
                     });
             });
@@ -110,29 +107,29 @@ function updateFileInfo(model) {
     console.log(sql, values);
 
     return new Promise((resolve, reject) => {
-        db.serialize(() => {
+        dbConn.serialize(() => {
             // 开始事务
-            db.run('BEGIN TRANSACTION');
+            dbConn.run('BEGIN TRANSACTION');
 
             // 更新resource表
 
-            db.run(sql, values, function (err) {
+            dbConn.run(sql, values, function (err) {
                 if (err) {
                     console.error('updateFileInfo - resource update', err.message);
-                    db.run('ROLLBACK');
+                    dbConn.run('ROLLBACK');
                     reject(err.message);
                     return;
                 }
 
                 // 处理create_by表
-                handleCreateByRecord(model)
+                saveCreateByInfo(model)
                     .then(() => {
-                        db.run('COMMIT');
+                        dbConn.run('COMMIT');
                         resolve({ changes: this.changes });
                     })
                     .catch(handleErr => {
                         console.error('updateFileInfo - create_by handle', handleErr);
-                        db.run('ROLLBACK');
+                        dbConn.run('ROLLBACK');
                         reject(handleErr);
                     });
             });
@@ -140,8 +137,8 @@ function updateFileInfo(model) {
     });
 }
 
-async function queryFileInfo(filename) {
-    let returnData = { ...resourceModel };
+async function dbQueryFileInfo(filename) {
+    let returnData = { ...dbResourceModel };
     try {
         result = await selectFileInfo(filename);
         console.log('nodejsQueryFileInfo', result);
@@ -154,9 +151,9 @@ async function queryFileInfo(filename) {
     return returnData;
 }
 
-async function saveFileInfo(model) {
+async function dbSaveFileInfo(model) {
     console.log(model);
-    let returnData = { ...resourceModel };
+    let returnData = { ...dbResourceModel };
     try {
         if (model.id == 0) {
             returnData = await insertFileInfo(model);
@@ -170,7 +167,8 @@ async function saveFileInfo(model) {
 }
 
 module.exports = {
-    queryFileInfo,
-    saveFileInfo,
-    resourceModel
+    dbResourceModel,
+    dbSetDbConn,
+    dbQueryFileInfo ,
+    dbSaveFileInfo,
 };

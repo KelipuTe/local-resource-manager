@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld('api', {
     ipcScanDir: (path) => ipcRenderer.invoke('ipcScanDir', path),
     ipcQueryFileInfo: (filename) => ipcRenderer.invoke('ipcQueryFileInfo', filename),
     ipcSaveFileInfo: (model) => ipcRenderer.invoke('ipcSaveFileInfo', model),
+    ipcRenameFile: (fullPath, newFileName) => ipcRenderer.invoke('ipcRenameFile', fullPath, newFileName),
 })

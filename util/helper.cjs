@@ -1,7 +1,7 @@
 function getNowDateTime() {
     const now = new Date();
 
-    // 月份从 0 开始
+    // 【getMonth()】拿到的月份是【0-11】
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
