@@ -2,7 +2,11 @@ const { app, BrowserWindow } = require('electron/main');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const { dbSetDbConn: dbSetDbConnResource } = require('./database/resourceDb.cjs');
-const { ipcSetMainWindow, ipcRegisterHandler } = require('./ipcHandler.cjs');
+const { dbSetDbConn: dbSetDbConnCreateBy } = require('./database/createByDb.cjs');
+const { fsSetMainWindow } = require('./nodejs/fs.cjs');
+const { ipcRegisterHandler } = require('./ipcHandler.cjs');
+
+// ---------------- 数据库 ----------------
 
 let dbPath = 'D:\\不知道什么时候会有用的仓库\\比较大的资源放外面\\resource.db';
 
@@ -15,6 +19,11 @@ const dbConn = new sqlite3.Database(dbPath, (err) => {
 });
 
 dbSetDbConnResource(dbConn);
+dbSetDbConnCreateBy(dbConn);
+
+// -------------------------------- 数据库 --------------------------------
+
+// ---------------- 主进程 ----------------
 
 let mainWindow;
 
@@ -36,7 +45,7 @@ const createWindow = () => {
     // mainWindow.loadFile('index.html')
     mainWindow.loadURL('http://localhost:5173');
 
-    ipcSetMainWindow(mainWindow);
+    fsSetMainWindow(mainWindow);
 };
 
 app.whenReady().then(() => {
@@ -70,3 +79,5 @@ app.on(
         }
     }
 );
+
+// -------------------------------- 主进程 --------------------------------

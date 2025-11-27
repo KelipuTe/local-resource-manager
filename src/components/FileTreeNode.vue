@@ -21,8 +21,8 @@
             </div>
             <!-- 子节点 -->
             <div v-show="dirIsOpen" class="children-container">
-                <FileTreeNode v-for="item in treeNodeData.children" :key="item.fullPath" :treeNodeData="item" :level="level + 1"
-                    @node-selected="emit('node-selected', $event)" />
+                <FileTreeNode v-for="item in treeNodeData.children" :key="item.fullPath" :treeNodeData="item"
+                    :level="level + 1" @node-selected="emit('node-selected', $event)" />
             </div>
         </div>
     </div>
@@ -60,6 +60,10 @@ const isHaveInfoFiletype = (nodeData) => {
 
 // 打开目录
 const vueOpenDir = async function () {
+    if (props.treeNodeData.isDir === false) {
+        return
+    }
+
     // 如果还没有加载过，则进行加载
     if (dirIsScan.value === false) {
         const result = await window.api.ipcScanDir(props.treeNodeData.fullPath)

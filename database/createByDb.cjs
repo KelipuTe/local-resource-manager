@@ -1,13 +1,10 @@
-const sqlite3 = require('sqlite3').verbose();
+const { getNowDateTime } = require('../util/time.cjs');
 
-let db;
-let dbPath = 'D:\\不知道什么时候会有用的仓库\\比较大的资源放外面\\resource.db';
+let dbConn;
 
-db = new sqlite3.Database(dbPath, (err) => {
-    if (err != null) {
-        console.error('sqlite3.Database', err.message);
-    }
-});
+function dbSetDbConn(conn) {
+    dbConn = conn;
+}
 
 const createByModel = {
     id: 0,
@@ -20,48 +17,60 @@ const createByModel = {
     update_at: 'CURRENT_TIMESTAMP',
 };
 
-// 新增函数：处理create_by表记录
-function saveCreateByInfo(model) {
-    const { source, user_id, user_name } = model;
+const defaultTextValue = '0';
 
-    // 如果缺少必要字段，跳过处理
-    if (!source || !user_id || !user_name) {
+/** 保存创作者信息（不存在就插入，存在就修改） */
+function saveCreateByInfo(model) {
+    const { source, user_id, username } = model;
+
+    if (source == null || user_id == null) {
         return Promise.resolve();
     }
 
     return new Promise((resolve, reject) => {
-        // 根据source和user_id查询记录
         const selectSql = 'SELECT * FROM `create_by` WHERE source = ? AND user_id = ?';
+        const selectValues = [source, user_id];
+        console.log(selectSql, selectValues);
 
-        db.get(selectSql, [source, user_id], (err, row) => {
-            if (err) {
-                console.error('handleCreateByRecord - select', err.message);
+        dbConn.get(selectSql, selectValues, (err, row) => {
+            if (err != null) {
+                console.error('saveCreateByInfo', err.message);
                 reject(err.message);
                 return;
             }
 
-            if (row) {
-                // 记录存在，更新数据
-                let newExtInfo = row.user_name;
-                if (row.ext_info) {
-                    newExtInfo = row.ext_info + ', ' + row.user_name;
+            if (row != null) {
+                let newExtInfo = row.ext_info
+                if (username != row.username) {
+                    const nowDateTime = getNowDateTime();
+                    const addExtInfo = `${nowDateTime}，从【${row.username}】修改为【${username}】；`;
+                    if (newExtInfo == defaultTextValue) {
+                        newExtInfo = addExtInfo;
+                    } else {
+                        newExtInfo = newExtInfo + addExtInfo;
+                    }
                 }
 
-                const updateSql = 'UPDATE `create_by` SET user_name = ?, ext_info = ?, update_at = CURRENT_TIMESTAMP WHERE id = ?';
-                db.run(updateSql, [user_name, newExtInfo, row.id], (updateErr) => {
-                    if (updateErr) {
-                        console.error('handleCreateByRecord - update', updateErr.message);
+                const updateSql = 'UPDATE `create_by` SET username = ?, ext_info = ?, update_at = CURRENT_TIMESTAMP WHERE id = ?';
+                const updateValues = [username, newExtInfo, row.id];
+                console.log(updateSql, updateValues);
+
+                dbConn.run(updateSql, updateValues, (updateErr) => {
+                    if (updateErr != null) {
+                        console.error('saveCreateByInfo', updateErr.message);
                         reject(updateErr.message);
                         return;
                     }
                     resolve();
                 });
             } else {
-                // 记录不存在，新增记录
-                const insertSql = 'INSERT INTO `create_by` (source, user_id, user_name, create_at, update_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
-                db.run(insertSql, [source, user_id, user_name], (insertErr) => {
-                    if (insertErr) {
-                        console.error('handleCreateByRecord - insert', insertErr.message);
+                const insertSql = 'INSERT INTO `create_by` (source, user_id, username, create_at, update_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)';
+                const insertValues = [source, user_id, username];
+                console.log(insertSql, insertValues);
+
+                dbConn.run(insertSql, insertValues, (insertErr) => {
+                    if (insertErr != null) {
+                        console.error('saveCreateByInfo', insertErr.message);
                         reject(insertErr.message);
                         return;
                     }
@@ -73,6 +82,7 @@ function saveCreateByInfo(model) {
 }
 
 module.exports = {
-    saveCreateByInfo: saveCreateByInfo,
-    createByModel
+    createByModel,
+    dbSetDbConn,
+    saveCreateByInfo
 };
