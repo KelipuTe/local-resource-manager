@@ -1,21 +1,21 @@
 const { app, BrowserWindow } = require('electron/main');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
-const { dbSetDbConn: dbSetDbConnResource } = require('./database/resourceDb.cjs');
-const { dbSetDbConn: dbSetDbConnCreateBy } = require('./database/createByDb.cjs');
+const { config } = require('./util/config.cjs');
+const { dbSetDbConn: dbSetDbConnResource } = require('./database/resource.cjs');
+const { dbSetDbConn: dbSetDbConnCreateBy } = require('./database/create_by.cjs');
 const { fsSetMainWindow } = require('./nodejs/fs.cjs');
 const { ipcRegisterHandler } = require('./ipcHandler.cjs');
 
+
 // ---------------- 数据库 ----------------
 
-let dbPath = 'D:\\不知道什么时候会有用的仓库\\比较大的资源放外面\\resource.db';
-
 // 打开数据库连接
-const dbConn = new sqlite3.Database(dbPath, (err) => {
+const dbConn = new sqlite3.Database(config.dbFullPath, (err) => {
     if (err != null) {
         console.error('sqlite3.Database', err.message);
     }
-    console.log('sqlite3.Database', 'open', dbPath);
+    console.log('sqlite3.Database', 'open', config.dbFullPath);
 });
 
 dbSetDbConnResource(dbConn);
@@ -71,7 +71,7 @@ app.on(
             if (err != null) {
                 console.error('sqlite3.Database', err.message);
             }
-            console.log('sqlite3.Database', 'close', dbPath)
+            console.log('sqlite3.Database', 'close', config.dbFullPath)
         });
 
         if (process.platform !== 'darwin') {

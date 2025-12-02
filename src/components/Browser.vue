@@ -7,9 +7,9 @@
                 <div style="width: 600px; overflow-x: auto; flex-shrink: 0;">
                     <p>
                         <span>选择的目录：{{ rootPath }}</span>
-                        <button @click="vueScanDir">扫描目录</button>
+                        <button @click="vueScanRootPath">扫描目录</button>
                     </p>
-                    <div v-show="dirIsScan">
+                    <div v-show="rootPathIsScan">
                         <FileTreeNode :treeNodeData="rootNodeData" :level="0" @node-selected="vueTreeNodeBeSelect" />
                     </div>
                 </div>
@@ -37,22 +37,22 @@
                     </div>
                     <div>
                         <h3>操作区域</h3>
-                        <p><button @click="vueSaveFileInfo" style="margin-top: 10px;">保存信息到数据库</button></p>
+                        <p>
+                            <button @click="vueQueryResourceInfo" style="margin-top: 10px;">查询（文件名）</button>
+                            <button @click="vueQueryResourceInfoV2" style="margin-top: 10px;">查询（信息）</button>
+                            <button @click="vueSaveResourceInfo" style="margin-top: 10px;">保存</button>
+                        </p>
                         <p>
                             <button @click="vueSeeRenameFile"
-                                style="margin-top: 10px; margin-left: 10px;">预览文件重命名</button>
+                                style="margin-top: 10px; margin-left: 10px;">重命名（预览）</button>
                             <button @click="vueDoRenameFile"
-                                style="margin-top: 10px; margin-left: 10px;">执行文件重命名</button>
-                            <button @click="vueSeeMoveFile" style="margin-top: 10px; margin-left: 10px;">预览文件归档</button>
-                            <button @click="vueDoMoveFile" style="margin-top: 10px; margin-left: 10px;">执行文件归档</button>
+                                style="margin-top: 10px; margin-left: 10px;">重命名（执行）</button>
+                            <button @click="vueSeeMoveFile" style="margin-top: 10px; margin-left: 10px;">归档（预览）</button>
+                            <button @click="vueDoMoveFile" style="margin-top: 10px; margin-left: 10px;">归档（执行）</button>
                         </p>
-                        <div v-if="renameResult"
-                            :style="{ color: renameResult.success ? 'green' : 'red', marginTop: '10px' }">
-                            {{ renameResult.message }}
-                        </div>
-                        <div v-if="moveResult"
-                            :style="{ color: moveResult.success ? 'green' : 'red', marginTop: '10px' }">
-                            {{ moveResult.message }}
+                        <div v-if="operateResult" 
+                            :style="{ color: operateResult.isSuccess ? 'green' : 'red', marginTop: '10px' }">
+                            <div v-html="operateResult.message"></div>
                         </div>
                     </div>
                     <div>
@@ -63,11 +63,16 @@
                             <div v-if="key === 'filename'" style="display: flex; align-items: center;">
                                 <input :value="value" type="text" style="flex: 1;"
                                     @input="vueFileInfoValueChange(key, $event.target.value)" />
-                                <button @click="makeFilenameByDateTime" style="margin-left: 10px; white-space: nowrap;">
-                                    基于时间生成文件名
+                                <button @click="vueMakeFilename" style="margin-left: 10px; white-space: nowrap;">
+                                    构造
                                 </button>
-                                <button @click="makeFilenameByInfo" style="margin-left: 5px; white-space: nowrap;">
-                                    基于信息生成文件名
+                            </div>
+                            <!-- resource_id 字段 -->
+                            <div v-else-if="key === 'resource_id'" style="display: flex; align-items: center;">
+                                <input :value="value" type="text" style="flex: 1;"
+                                    @input="vueFileInfoValueChange(key, $event.target.value)" />
+                                <button @click="vueMakeResourseId" style="margin-left: 5px; white-space: nowrap;">
+                                    构造
                                 </button>
                             </div>
                             <!-- summary 字段 -->
@@ -86,12 +91,13 @@
 <script setup>
 import { ref } from 'vue'
 import FileTreeNode from './FileTreeNode.vue'
+import { getNowDateTimeV2 } from '../util/time.js'
 
 const rootPath = localStorage.getItem('rootPath');
 
 const rootNodeData = ref({
     dirPath: rootPath,
-    name: 'root',
+    name: '根目录',
     isDir: true,
     extname: '',
     fullPath: rootPath,
@@ -99,21 +105,24 @@ const rootNodeData = ref({
     childrenIsLoad: false
 })
 
-const dirIsScan = ref(false)
+const rootPathIsScan = ref(false)
 
-const vueScanDir = async function () {
+const vueScanRootPath = async function () {
+    // const thisFuncName = 'vueScanDir';
+
     const result = await window.api.ipcScanDir(rootPath)
-    console.log('vueScanDir', result)
+
+    // console.log(thisFuncName, result)
 
     rootNodeData.value.children = result;
     rootNodeData.value.childrenIsLoad = true;
-    dirIsScan.value = true;
+    rootPathIsScan.value = true;
 
     beSelectNode.value = null;
     fileInfo.value = null;
 }
 
-// 用于存储选中的节点
+// 选中的文件树结点
 const beSelectNode = ref(null)
 
 const fileInfoDefault = {
@@ -139,18 +148,11 @@ const fileInfoDefault = {
 const fileInfo = ref(null)
 
 // 处理节点选中事件
-const vueTreeNodeBeSelect = async (node) => {
-    beSelectNode.value = node
-    if (!node.isDir) {
-        try {
-            const result = await window.api.ipcQueryFileInfo(node.name)
-            console.log('vueNewNodeBeSelect', result)
+const vueTreeNodeBeSelect = async (nodeData) => {
+    // const thisFuncName = 'vueTreeNodeBeSelect';
 
-            fileInfo.value = { ...fileInfoDefault, ...result }
-        } catch (error) {
-            console.error('vueNewNodeBeSelect', error)
-        }
-    }
+    beSelectNode.value = nodeData
+    await vueQueryResourceInfo();
 }
 
 // 可以预览的文件类型
@@ -185,7 +187,7 @@ const fileInfoKeyNameMap = {
     filetype: '文件类型',
     source: '资源的来源',
     resource_id: '资源的id',
-    resource_index: '下标',
+    resource_index: '资源的下标',
     user_id: '资源所属用户的id',
     username: '资源所属用户的名称',
     user_ext_info: '资源所属用户的额外信息',
@@ -200,191 +202,210 @@ const fileInfoKeyNameMap = {
     create_at: '创建时间',
     update_at: '修改时间'
 }
-// 获取字段标签的方法
+// 获取字段标签
 const vueGetFileInfoKeyName = (key) => {
     return fileInfoKeyNameMap[key] || key;
 }
 
-// 新增处理字段变化的方法
+// 相当于【v-model】，让数据源和输入框同步
 const vueFileInfoValueChange = (key, value) => {
     if (fileInfo.value) {
         fileInfo.value[key] = value;
     }
 };
 
+const operateResult = ref(null)
+
+const vueShowError = (error) => {
+    operateResult.value = {
+        isSuccess: false,
+        message: '操作失败：' + error
+    };
+}
+
+const vueQueryResourceInfo = async () => {
+    // const thisFuncName = 'vueQueryResourceInfo';
+
+    const nodeData = beSelectNode.value
+    if (!nodeData.isDir) {
+        try {
+            const dbModel = { filename: nodeData.name }
+            const result = await window.api.ipcQueryResourceInfo(dbModel)
+            // console.log(thisFuncName, result)
+            fileInfo.value = { ...fileInfoDefault, ...result }
+        } catch (error) {
+            // console.error(thisFuncName, error)
+            vueShowError(error);
+        }
+    }
+};
+
+const vueQueryResourceInfoV2 = async () => {
+    // const thisFuncName = 'vueQueryResourceInfoV2';
+
+    const nodeData = beSelectNode.value
+    if (!nodeData.isDir) {
+        try {
+            const dbModel = {
+                source: fileInfo.value.source,
+                resource_id: fileInfo.value.resource_id,
+                user_id: fileInfo.value.user_id,
+            }
+            const result = await window.api.ipcQueryResourceInfoV2(dbModel)
+            // console.log(thisFuncName, result)
+            fileInfo.value = { ...fileInfoDefault, ...result }
+        } catch (error) {
+            // console.error(thisFuncName, error)
+            vueShowError(error);
+        }
+    }
+};
+
 // 新增保存文件信息功能
-const vueSaveFileInfo = async () => {
+const vueSaveResourceInfo = async () => {
+    // const thisFuncName = 'vueSaveFileInfo';
+
     if (fileInfo.value != null) {
         try {
-            const model = { ...fileInfo.value }
-            const result = await window.api.ipcSaveFileInfo(model);
-            console.log('vueSaveFileInfo', result);
+            const argModel = { ...fileInfo.value }
+            const result = await window.api.ipcSaveResourceInfo(argModel);
+            // console.log(thisFuncName, result);
+            operateResult.value = {
+                isSuccess: true,
+                message: '操作成功：' + JSON.stringify(result)
+            };
         } catch (error) {
-            console.error('vueSaveFileInfo', error);
+            // console.error(thisFuncName, error);
+            vueShowError(error);
         }
     }
 }
 
-// 基于时间生成文件名 (发布日期_资源来源_用户id_资源id_资源index)
-const makeFilenameByDateTime = () => {
+// 构造【文件名】（资源的id_资源的下标_重命名时间）
+const vueMakeFilename = () => {
     if (fileInfo.value == null) {
         return;
     }
-
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-
-    const resourceId = `${year}${month}${day}${hours}${minutes}${seconds}`;
-
     const resourceIndex = fileInfo.value.resource_index;
-    const userId = fileInfo.value.user_id;
-    const source = fileInfo.value.source;
-
-    let publishAt = '00000000';
-    if (fileInfo.value.publish_at != '0') {
-        try {
-            const date = new Date(fileInfo.value.publish_at);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            publishAt = `${year}${month}${day}`;
-        } catch (err) {
-            alert('makeFilenameByDateTime', err);
-            return;
-        }
-    } else {
-        const date = new Date();
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        publishAt = `${year}${month}${day}`;
-    }
-
-    const newName = `${publishAt}_${source}_${userId}_${resourceId}_${resourceIndex}`;
-    vueFileInfoValueChange('filename', newName);
-};
-
-// 基于信息生成文件名 (发布日期_资源来源_用户id_资源id_资源index)
-const makeFilenameByInfo = () => {
-    if (fileInfo.value == null) {
-        return;
-    }
-
     const resourceId = fileInfo.value.resource_id;
-    const resourceIndex = fileInfo.value.resource_index;
-    const userId = fileInfo.value.user_id;
-    const source = fileInfo.value.source;
-
-    let publishAt = '00000000';
-    if (fileInfo.value.publish_at != '0') {
-        try {
-            const date = new Date(fileInfo.value.publish_at);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            publishAt = `${year}${month}${day}`;
-        } catch (err) {
-            alert('makeFilenameByInfo', err);
-            return;
-        }
-    } else {
-        const date = new Date();
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        publishAt = `${year}${month}${day}`;
-    }
-
-    const newName = `${publishAt}_${source}_${userId}_${resourceId}_${resourceIndex}`;
+    const dateTime = getNowDateTimeV2()
+    const newName = `${resourceId}_${resourceIndex}_${dateTime}`;
     vueFileInfoValueChange('filename', newName);
 };
 
-// 添加重命名结果状态
-const renameResult = ref(null)
+// 构造【资源的id】
+const vueMakeResourseId = () => {
+    if (fileInfo.value == null) {
+        return;
+    }
+    const dateTime = getNowDateTimeV2();
+    vueFileInfoValueChange('resource_id', dateTime);
+};
 
 const vueSeeRenameFile = async () => {
+    // const thisFuncName = 'vueSeeRenameFile';
+
     if (beSelectNode.value == null) {
-        renameResult.value = {
-            success: false,
-            message: '没有选中的文件'
-        };
+        vueShowError('没有选中的文件树结点');
         return;
     }
 
     try {
-        const argBeSelectNode = { ...beSelectNode.value }
-        const argFileInfo = { ...fileInfo.value }
+        const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
+        const argFileInfo = JSON.parse(JSON.stringify(fileInfo.value))
         const result = await window.api.ipcSeeRenameFile(argBeSelectNode, argFileInfo);
-        console.log('vueDoRenameFile', result);
+        // console.log(thisFuncName, result);
+        const needRenameFileList = result.needRenameFileList;
+        operateResult.value = {
+            isSuccess: true,
+            message: '需要重命名的文件：<br>' + needRenameFileList.join('<br>')
+        };
     } catch (error) {
-        console.error('vueSeeRenameFile', error);
+        // console.error(thisFuncName, error);
+        vueShowError(error);
     }
 }
 
-// 添加重命名文件功能
 const vueDoRenameFile = async () => {
+    // const thisFuncName = 'vueDoRenameFile';
+
     if (beSelectNode.value == null) {
-        renameResult.value = {
-            success: false,
-            message: '没有选中的文件'
-        };
+        vueShowError('没有选中的文件树结点');
         return;
     }
 
     try {
-        const argBeSelectNode = { ...beSelectNode.value }
-        const argFileInfo = { ...fileInfo.value }
+        const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
+        const argFileInfo = JSON.parse(JSON.stringify(fileInfo.value))
         const result = await window.api.ipcDoRenameFile(argBeSelectNode, argFileInfo);
-        console.log('vueDoRenameFile', result);
+        // console.log(thisFuncName, result);
+        const dirPath = result.dirPath;
+        const renameFileList = result.renameFileList;
+        let message = '目录【' + dirPath + '】<br>'
+        for (const item of renameFileList) {
+            message += '文件【' + item.oldFilename + '】被重命名为【' + item.newFilename + '】<br>'
+        }
+        operateResult.value = {
+            isSuccess: true,
+            message: message
+        };
     } catch (error) {
-        console.error('vueDoRenameFile', error);
+        // console.error(thisFuncName, error);
+        vueShowError(error);
     }
 };
 
-// 添加归档结果状态
-const moveResult = ref(null)
-
 const vueSeeMoveFile = async () => {
+    // const thisFuncName = 'vueSeeMoveFile';
+
     if (beSelectNode.value == null) {
-        moveResult.value = {
-            success: false,
-            message: '没有选中的文件'
-        };
+        vueShowError('没有选中的文件树结点或者资源信息不全');
         return;
     }
 
     try {
-        const argBeSelectNode = { ...beSelectNode.value }
-        const argFileInfo = { ...fileInfo.value }
+        const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
+        const argFileInfo = JSON.parse(JSON.stringify(fileInfo.value))
         const result = await window.api.ipcSeeMoveFile(argBeSelectNode, argFileInfo);
-        console.log('vueSeeMoveFile', result);
+        // console.log(thisFuncName, result);
+        const dirPath = result.dirPath;
+        const newDirPath = result.newDirPath;
+        const needMoveFileList = result.needMoveFileList;
+        operateResult.value = {
+            isSuccess: true,
+            message: '以下文件：<br>' + needMoveFileList.join('<br>') + '<br>将被从目录：' + dirPath + '<br>移动到目录：' + newDirPath
+        };
     } catch (error) {
-        console.error('vueSeeMoveFile', error);
+        // console.error(thisFuncName, error);
+        vueShowError(error);
     }
 }
 
-// 添加归档文件功能
 const vueDoMoveFile = async () => {
+    // const thisFuncName = 'vueDoMoveFile';
+
     if (!beSelectNode.value || !fileInfo.value) {
-        moveResult.value = {
-            success: false,
-            message: '没有选中的文件或文件信息缺失'
-        };
+        vueShowError('没有选中的文件树结点或者资源信息不全');
         return;
     }
 
     try {
-        const argBeSelectNode = { ...beSelectNode.value }
-        const argFileInfo = { ...fileInfo.value }
+        const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
+        const argFileInfo = JSON.parse(JSON.stringify(fileInfo.value))
         const result = await window.api.ipcDoMoveFile(argBeSelectNode, argFileInfo);
-        console.log('vueDoMoveFile', result);
+        // console.log(thisFuncName, result);
+        const moveFileList = result.moveFileList;
+        let message = ''
+        for (const item of moveFileList) {
+            message += '文件【' + item.filename + '】的全路径<br>--|从：' + item.oldFullPath + '<br>--|改成：' + item.newFullPath + '<br>'
+        }
+        operateResult.value = {
+            isSuccess: true,
+            message: message
+        };
     } catch (error) {
-        console.error('vueDoMoveFile', error);
+        // console.error(thisFuncName, error);
+        vueShowError(error);
     }
 };
 </script>

@@ -1,14 +1,21 @@
 const { dialog } = require('electron/main');
 const fs = require('fs/promises');
 const path = require('path');
+const { config } = require('../util/config.cjs');
+const { config: dbConfig } = require('../database/config.cjs');
 
 let mainWindow;
 
-/** 【依赖注入】设置主窗口的引用 */
+/**
+ * 【依赖注入】设置主窗口的引用
+ */
 function fsSetMainWindow(window) {
     mainWindow = window;
 }
 
+/**
+ * 选择目录
+ */
 async function fsSelectDir(options) {
     let returnData = '';
     const result = await dialog.showOpenDialog(
@@ -25,7 +32,9 @@ async function fsSelectDir(options) {
 }
 
 /** 
- * dirPath。所属目录的路径。
+ * 扫描目录 
+ * @param dirPath 所属目录的路径。
+ * @returns 
  * name。目录名或者文件名。
  * extname。文件扩展名。
  * fullPath。目录的全路径或者文件的全路径。
@@ -36,52 +45,49 @@ async function fsScanDir(dirPath) {
 
     const returnData = [];
     const result = await fs.readdir(dirPath, { withFileTypes: true });
-    for (item of result) {
+    for (const item of result) {
+        const isDir = item.isDirectory();
+
         let extname = '';
-        if (!item.isDirectory()) {
+        if (!isDir) {
             const index = item.name.lastIndexOf('.');
             if (index > 0) {
                 extname = item.name.substring(index + 1);
             }
         }
+
         returnData.push({
             dirPath: dirPath,
             name: item.name,
-            isDir: item.isDirectory(),
+            isDir: isDir,
             extname: extname,
             fullPath: path.join(dirPath, item.name),
-            children: item.isDirectory() ? [] : null,
+            children: [],
             childrenIsLoad: false,
         });
     }
+
     return returnData;
 }
 
-async function fsSeeRenameFile(beSelectNode, fileInfo) {
-    // path.parse().name。获取文件名（不带文件扩展名）。
-    // Array.filter()。遍历数组，查找所有文件名和老文件名相同的文件。
-    // Array.some()。遍历数组，检查是否有文件名和新文件名相同的文件。
-    // 最后检查一下，目录下存不存在文件名和重命名相同的文件。
+/**
+ * 重命名文件（预览）
+ * @param {Object} nodeData 被选中的结点
+ * @param {Object} dbMixModel dbResourceAndCreateByModel
+ */
+async function fsSeeRenameFile(nodeData, dbMixModel) {
+    const dirPath = nodeData.dirPath;
 
-    const dirPath = beSelectNode.dirPath;
-    const oldBaseName = path.parse(beSelectNode.name).name;
+    // path.parse().name。获取文件名（不带文件扩展名）。
+    const oldBaseName = path.parse(nodeData.name).name;
 
     const result = await fs.readdir(dirPath);
 
+    // Array.filter()。遍历数组，查找所有文件名和老文件名相同的文件。
     const needRenameFileList = result.filter(item => {
         const baseName = path.parse(item).name;
         return baseName === oldBaseName;
     })
-
-    const newBaseName = fileInfo.filename;
-    const IsNewBaseNameExist = result.some(item => {
-        const baseName = path.parse(item).name;
-        return baseName === newBaseName;
-    })
-
-    if (IsNewBaseNameExist) {
-        throw new Error('目录下存在重命名后文件名相同的文件')
-    }
 
     const returnData = {
         dirPath: dirPath,
@@ -91,20 +97,22 @@ async function fsSeeRenameFile(beSelectNode, fileInfo) {
     return returnData
 }
 
-async function fsDoRenameFile(beSelectNode, fileInfo) {
-    // path.parse().ext。获取文件扩展名（带前面的【.】）。
-    // fs.rename()。执行文件重命名。
+/**
+ * 重命名文件（执行）
+ * 重命名规则。资源id_资源index_重命名时间
+ */
+async function fsDoRenameFile(nodeData, dbMixModel) {
+    const dirPath = nodeData.dirPath;
+    const newBaseName = dbMixModel.filename;
 
-    const dirPath = beSelectNode.dirPath;
-
-    const result = await fsSeeRenameFile(beSelectNode, fileInfo);
+    const result = await fsSeeRenameFile(nodeData, dbMixModel);
     const needRenameFileList = result.needRenameFileList;
-
-    const newBaseName = fileInfo.filename;
 
     const renameFileList = [];
 
-    for (item of needRenameFileList) {
+    // path.parse().ext。获取文件扩展名（带前面的【.】）。
+    // fs.rename()。执行文件重命名。
+    for (const item of needRenameFileList) {
         const oldFilename = item;
         const oldFullPath = path.join(dirPath, oldFilename);
         const oldExtname = path.parse(oldFilename).ext;
@@ -127,56 +135,43 @@ async function fsDoRenameFile(beSelectNode, fileInfo) {
     return returnData;
 }
 
-const rootDirPath = 'D:\\不知道什么时候会有用的仓库\\比较大的资源放外面';
+/**
+ * 归档文件（预览）
+ * 归档目录规则。根目录/分类目录/资源的发布时间/资源来源_用户id_资源id/
+ */
+async function fsSeeMoveFile(nodeData, dbMixModel) {
+    const dirPath = nodeData.dirPath
+    const baseName = dbMixModel.filename
+    const source = dbMixModel.source;
+    const userId = dbMixModel.user_id;
+    const resourceId = dbMixModel.resource_id;
+    const publishAt = dbMixModel.publish_at;
+    const keyPoint = dbMixModel.key_point;
 
-const keyPointDirMap = {
-    '画面': '画面是重点的资源',
-    '声音': '声音是重点的资源',
-    '文字': '文字是重点的资源'
-};
-
-async function fsSeeMoveFile(beSelectNode, fileInfo) {
-    // baseName。发布日期_资源来源_用户id_资源id_资源index
-    // prefixName。发布日期_资源来源_用户id_资源id
-
-    const keyPoint = fileInfo.key_point;
-    if (keyPointDirMap[keyPoint] == null) {
-        throw new Error(`【${keyPoint}】没有设置对应的归档目录`);
+    // 分类目录
+    if (keyPoint == null || keyPoint == dbConfig.dbTextDefaultValue) {
+        throw new Error('缺少【key_point】字段');
     }
 
-    const dirPath = beSelectNode.dirPath
-
-    const baseName = fileInfo.filename
+    // 扫描需要归档的文件
+    const result = await fs.readdir(dirPath);
     const prefixName = baseName.substring(0, baseName.lastIndexOf('_'));
-
-    const dirPathResult = await fs.readdir(dirPath);
-
-    const needMoveFileList = dirPathResult.filter(item => {
+    const needMoveFileList = result.filter(item => {
         const baseName = path.parse(item).name;
         return baseName.startsWith(prefixName);
     })
 
-    const keyPointDir = keyPointDirMap[keyPoint];
-    const newDirPath = path.join(rootDirPath, keyPointDir, prefixName);
-
-    await fs.mkdir(newDirPath, { recursive: true });
-
-    const newDirPathResult = await fs.readdir(newDirPath);
-
-    let IsNewDirFileExist = false
-    for (itemMoveFilename of needMoveFileList) {
-        IsNewDirFileExist = newDirPathResult.some(itemNewDirFile => {
-            const newDirFilename = path.parse(itemNewDirFile).name;
-            return newDirFilename === itemMoveFilename;
-        })
-        if (IsNewDirFileExist) {
-            break;
-        }
+    // 资源的发布时间
+    let year = '0000';
+    if (publishAt != null && publishAt != dbConfig.dbTextDefaultValue) {
+        year = new Date(publishAt).getFullYear().toString();
+    } else {
+        year = '0_'+resourceId.substring(0, 4);
     }
 
-    if (IsNewDirFileExist) {
-        throw new Error('目标目录下存在归档后文件名相同的文件')
-    }
+    // 资源来源_用户id_资源id
+    const s_u_r = `${source}_${userId}_${resourceId}`;
+    const newDirPath = path.join(config.rootPath, keyPoint, year, s_u_r);
 
     const returnData = {
         dirPath: dirPath,
@@ -187,51 +182,32 @@ async function fsSeeMoveFile(beSelectNode, fileInfo) {
     return returnData;
 }
 
-async function fsDoMoveFile(beSelectNode, fileInfo) {
-    const result = await fsSeeMoveFile(beSelectNode, fileInfo);
-    const needMoveFileList = result.needMoveFileList;
+/**
+ * 归档文件（执行）
+ * 归档目录规则。根目录/分类目录/资源的发布时间/资源来源_用户id_资源id/
+ */
+async function fsDoMoveFile(nodeData, dbMixModel) {
+    const result = await fsSeeMoveFile(nodeData, dbMixModel);
 
     const dirPath = result.dirPath;
     const newDirPath = result.newDirPath;
+    const needMoveFileList = result.needMoveFileList;
+
+    // 创建目录。【recursive: true】表示递归创建。
+    await fs.mkdir(newDirPath, { recursive: true });
 
     const moveFileList = [];
+    for (const item of needMoveFileList) {
+        const oldFullPath = path.join(dirPath, item);
+        const newFullPath = path.join(newDirPath, item);
 
-    for (const filename of needMoveFileList) {
-        const oldFilePath = path.join(dirPath, filename);
-        let newFilePath = path.join(newDirPath, filename);
+        await fs.rename(oldFullPath, newFullPath);
 
-        // 检查目标文件是否已存在
-        try {
-            await fs.access(newFilePath);
-            // 文件存在，需要重命名
-            const fileStat = await fs.stat(newFilePath);
-            console.log(fileStat)
-            const mtime = fileStat.mtime;
-            // 修改日期格式，添加时分秒信息，拆分成日期和时间两部分
-            const datePart = mtime.toISOString().slice(0, 10).replace(/-/g, '');
-            const timePart = mtime.toISOString().slice(11, 19).replace(/:/g, '');
-            
-            const parsedPath = path.parse(filename);
-            const newFilename = `${parsedPath.name}_${datePart}${timePart}${parsedPath.ext}`;
-            newFilePath = path.join(newDirPath, newFilename);
-            
-            await fs.rename(oldFilePath, newFilePath);
-            moveFileList.push({
-                oldFilePath: oldFilePath,
-                newFilePath: newFilePath,
-                oldFilename: filename,
-                newFilename: newFilename
-            });
-        } catch (err) {
-            // 文件不存在，直接移动
-            await fs.rename(oldFilePath, newFilePath);
-            moveFileList.push({
-                oldFilePath: oldFilePath,
-                newFilePath: newFilePath,
-                oldFilename: filename,
-                newFilename: filename
-            });
-        }
+        moveFileList.push({
+            filename: item,
+            oldFullPath: oldFullPath,
+            newFullPath: newFullPath,
+        });
     }
 
     const returnData = {
