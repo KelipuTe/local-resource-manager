@@ -137,7 +137,7 @@ async function fsDoRenameFile(nodeData, dbMixModel) {
 
 /**
  * 归档文件（预览）
- * 归档目录规则。根目录/分类目录/资源的发布时间/资源来源_用户id_资源id/
+ * 归档目录规则。根目录\分类目录\资源的发布时间\资源的来源\资源所属用户的id\资源的id\
  */
 async function fsSeeMoveFile(nodeData, dbMixModel) {
     const dirPath = nodeData.dirPath
@@ -166,12 +166,10 @@ async function fsSeeMoveFile(nodeData, dbMixModel) {
     if (publishAt != null && publishAt != dbConfig.dbTextDefaultValue) {
         year = new Date(publishAt).getFullYear().toString();
     } else {
-        year = '0_'+resourceId.substring(0, 4);
+        year = '0_' + resourceId.substring(0, 4);
     }
 
-    // 资源来源_用户id_资源id
-    const s_u_r = `${source}_${userId}_${resourceId}`;
-    const newDirPath = path.join(config.rootPath, keyPoint, year, s_u_r);
+    const newDirPath = path.join(config.rootPath, keyPoint, year, source, userId, resourceId);
 
     const returnData = {
         dirPath: dirPath,
@@ -184,7 +182,7 @@ async function fsSeeMoveFile(nodeData, dbMixModel) {
 
 /**
  * 归档文件（执行）
- * 归档目录规则。根目录/分类目录/资源的发布时间/资源来源_用户id_资源id/
+ * 归档目录规则。根目录\分类目录\资源的发布时间\资源的来源\资源所属用户的id\资源的id\
  */
 async function fsDoMoveFile(nodeData, dbMixModel) {
     const result = await fsSeeMoveFile(nodeData, dbMixModel);

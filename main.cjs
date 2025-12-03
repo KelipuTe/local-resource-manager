@@ -7,6 +7,7 @@ const { dbSetDbConn: dbSetDbConnCreateBy } = require('./database/create_by.cjs')
 const { fsSetMainWindow } = require('./nodejs/fs.cjs');
 const { ipcRegisterHandler } = require('./ipcHandler.cjs');
 
+process.env.CHARSET = 'UTF-8';
 
 // ---------------- 数据库 ----------------
 
@@ -28,7 +29,7 @@ dbSetDbConnCreateBy(dbConn);
 let mainWindow;
 
 const createWindow = () => {
-    // webSecurity=false。禁用【Web安全策略】。允许渲染进程访问本地文件。比如：图片、视频、音频、等。
+    // webSecurity=false。禁用【Web 安全策略】。允许渲染进程访问本地文件。比如：图片、视频、音频、等。
     mainWindow = new BrowserWindow({
         width: 1600,
         height: 900,
@@ -48,36 +49,28 @@ const createWindow = () => {
     fsSetMainWindow(mainWindow);
 };
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     createWindow();
-
     ipcRegisterHandler();
-
-    app.on(
-        'activate',
-        () => {
-            if (BrowserWindow.getAllWindows().length === 0) {
-                createWindow();
-            }
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
         }
-    );
+    });
 });
 
-app.on(
-    'window-all-closed',
-    () => {
-        // 关闭数据库连接
-        dbConn.close((err) => {
-            if (err != null) {
-                console.error('sqlite3.Database', err.message);
-            }
-            console.log('sqlite3.Database', 'close', config.dbFullPath)
-        });
-
-        if (process.platform !== 'darwin') {
-            app.quit();
+app.on('window-all-closed', () => {
+    // 关闭数据库连接
+    dbConn.close((err) => {
+        if (err != null) {
+            console.error('sqlite3.Database', err.message);
         }
+        console.log('sqlite3.Database', 'close', config.dbFullPath)
+    });
+
+    if (process.platform !== 'darwin') {
+        app.quit();
     }
-);
+});
 
 // -------------------------------- 主进程 --------------------------------
