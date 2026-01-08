@@ -1,86 +1,122 @@
 <template>
-    <div>
-        <div>浏览</div>
-        <div>
-            <div style="display: flex; max-height: 80vh; overflow: hidden;">
-                <!-- 左侧，文件树，固定宽度 -->
-                <div style="width: 600px; overflow-x: auto; flex-shrink: 0;">
-                    <p>
-                        <span>选择的目录：{{ rootPath }}</span>
-                        <button @click="vueScanRootPath">扫描目录</button>
-                    </p>
-                    <div v-show="rootPathIsScan">
-                        <FileTreeNode :treeNodeData="rootNodeData" :level="0" @node-selected="vueTreeNodeBeSelect" />
+    <div class="browser">
+        <!-- 左边的文件树 -->
+        <div class="file-tree">
+            <div class="form-container">
+                <p class="form-group">
+                    <input v-model="rootDir" placeholder="请设置根目录" class="input-medium"></input>
+                    <button @click="fnScanRootDir" class="btn-blue btn-medium">扫描目录</button>
+                </p>
+            </div>
+            <div v-show="rootDirIsScan">
+                <FileTreeNode :treeNodeData="rootNodeData" :level="0" @node-selected="fnTreeNodeBeSelect" />
+            </div>
+        </div>
+        <!-- 右边的区域 -->
+        <div class="resource-info">
+            <h3>结点的信息</h3>
+            <div>
+                <div v-if="beSelectNode != null">
+                    <p>目录: {{ beSelectNode.dirPath }}</p>
+                    <p>文件名: {{ beSelectNode.name }}</p>
+                </div>
+                <div v-if="beSelectNode != null && fnIsCanPreview(beSelectNode)" class="preview-container">
+                    <img v-if="fnIsImageFile(beSelectNode)" :src="'file://' + beSelectNode.fullPath" alt="图片加载失败"
+                        class="preview-img">
+                    <video v-else-if="fnIsVideoFile(beSelectNode)" :src="'file://' + beSelectNode.fullPath" controls
+                        class="preview-video">
+                        视频加载失败
+                    </video>
+                </div>
+            </div>
+            <h3>
+                <span>资源的信息</span>
+                <button @click="resourceInfoIsVisible = !resourceInfoIsVisible" class="btn-blue btn-medium">
+                    {{ resourceInfoIsVisible ? '收起' : '展开' }}
+                </button>
+            </h3>
+            <div v-if="resourceInfoIsVisible">
+                <div class="form-container">
+                    <div class="form-group">
+                        <button @click="vueGetResourceInfo" class="btn-green btn-medium">查询（文件名）</button>
+                        <button @click="vueGetResourceInfoV2" class="btn-green btn-medium">查询（信息）</button>
+                        <button @click="vueSaveResourceInfo" class="btn-orange btn-medium">保存（信息）</button>
+                    </div>
+                    <div class="form-group">
+                        <button @click="vueSeeRenameFile" class="btn-green btn-medium">重命名（预览）</button>
+                        <button @click="vueDoRenameFile" class="btn-orange btn-medium">重命名（执行）</button>
+                        <button @click="vueSeeMoveFile" class="btn-green btn-medium">归档（预览）</button>
+                        <button @click="vueDoMoveFile" class="btn-orange btn-medium">归档（执行）</button>
                     </div>
                 </div>
-                <!-- 右侧，详细信息，动态宽度 -->
-                <div v-if="beSelectNode"
-                    style="flex: 1; padding: 10px; border: 1px solid #ccc; min-width: 900px; overflow: auto;">
-                    <div>
-                        <h3>选中的节点信息</h3>
-                        <p><strong>所属目录的路径:</strong> {{ beSelectNode.dirPath }}</p>
-                        <p><strong>目录名或者文件名:</strong> {{ beSelectNode.name }}</p>
-                        <p><strong>目录的全路径或者文件的全路径:</strong> {{ beSelectNode.fullPath }}</p>
-                    </div>
-                    <div v-if="isCanPreviewFile(beSelectNode)" style="margin-bottom: 20px;">
-                        <h3>预览区域</h3>
-                        <div style="max-width: 100%; max-height: 420px; overflow: auto;">
-                            <!-- 图片预览 -->
-                            <img v-if="isImageFile(beSelectNode)" :src="'file://' + beSelectNode.fullPath" alt="预览图片"
-                                style="max-width: 100%; max-height: 400px;" />
-                            <!-- 视频预览 -->
-                            <video v-else-if="isVideoFile(beSelectNode)" :src="'file://' + beSelectNode.fullPath"
-                                controls style="max-width: 100%; max-height: 400px;">
-                                您的浏览器不支持视频播放。
-                            </video>
+                <div class="form-container">
+                    <div v-for="(value, key) in resourceInfo" :key="key" class="form-group">
+                        <label class="input-label">{{ fnGetResourceInfoKeyName(key) }}</label>
+
+                        <!-- filename 字段 -->
+                        <div v-if="key === 'filename'">
+                            <input :value="value" type="text" class="input-long"
+                                @input="fnChangeResourceInfoValue(key, $event.target.value)" />
+                            <button @click="vueMakeFilename" class="btn-blue btn-medium">构造</button>
+                        </div>
+
+                        <!-- resource_id 字段 -->
+                        <div v-else-if="key === 'resource_id'">
+                            <input :value="value" type="text" class="input-long"
+                                @input="fnChangeResourceInfoValue(key, $event.target.value)" />
+                            <button @click="vueMakeResourseId" class="btn-blue btn-medium">构造</button>
+                        </div>
+
+                        <!-- summary 字段 -->
+                        <div v-else-if="key === 'summary'">
+                            <textarea :value="value" rows="10" class="input-long"
+                                @input="fnChangeResourceInfoValue(key, $event.target.value)"></textarea>
+                        </div>
+
+                        <!-- 其他字段 -->
+                        <div v-else>
+                            <input :value="value" type="text" class="input-long"
+                                @input="fnChangeResourceInfoValue(key, $event.target.value)" />
                         </div>
                     </div>
-                    <div>
-                        <h3>操作区域</h3>
-                        <p>
-                            <button @click="vueQueryResourceInfo" style="margin-top: 10px;">查询（文件名）</button>
-                            <button @click="vueQueryResourceInfoV2" style="margin-top: 10px;">查询（信息）</button>
-                            <button @click="vueSaveResourceInfo" style="margin-top: 10px;">保存</button>
-                        </p>
-                        <p>
-                            <button @click="vueSeeRenameFile"
-                                style="margin-top: 10px; margin-left: 10px;">重命名（预览）</button>
-                            <button @click="vueDoRenameFile"
-                                style="margin-top: 10px; margin-left: 10px;">重命名（执行）</button>
-                            <button @click="vueSeeMoveFile" style="margin-top: 10px; margin-left: 10px;">归档（预览）</button>
-                            <button @click="vueDoMoveFile" style="margin-top: 10px; margin-left: 10px;">归档（执行）</button>
-                        </p>
-                        <div v-if="operateResult" 
-                            :style="{ color: operateResult.isSuccess ? 'green' : 'red', marginTop: '10px' }">
-                            <div v-html="operateResult.message"></div>
-                        </div>
+                </div>
+            </div>
+            <h3>
+                <span>标签的信息</span>
+                <button @click="resourceTagIsVisible = !resourceTagIsVisible" class="btn-blue btn-medium">
+                    {{ resourceTagIsVisible ? '收起' : '展开' }}
+                </button>
+            </h3>
+            <div v-if="resourceTagIsVisible && resourceInfo != null">
+                <div class="form-container">
+                    <div class="form-group">
+                        <label class="input-label">资源的标签</label>
+                        <button @click="fnSaveResourceTag" class="btn-orange btn-medium">保存标签</button>
                     </div>
-                    <div>
-                        <h3>数据库中的信息</h3>
-                        <div v-for="(value, key) in fileInfo" :key="key" style="margin-bottom: 10px;">
-                            <label><strong>{{ vueGetFileInfoKeyName(key) }}:</strong></label>
-                            <!-- filename 字段 -->
-                            <div v-if="key === 'filename'" style="display: flex; align-items: center;">
-                                <input :value="value" type="text" style="flex: 1;"
-                                    @input="vueFileInfoValueChange(key, $event.target.value)" />
-                                <button @click="vueMakeFilename" style="margin-left: 10px; white-space: nowrap;">
-                                    构造
-                                </button>
-                            </div>
-                            <!-- resource_id 字段 -->
-                            <div v-else-if="key === 'resource_id'" style="display: flex; align-items: center;">
-                                <input :value="value" type="text" style="flex: 1;"
-                                    @input="vueFileInfoValueChange(key, $event.target.value)" />
-                                <button @click="vueMakeResourseId" style="margin-left: 5px; white-space: nowrap;">
-                                    构造
-                                </button>
-                            </div>
-                            <!-- summary 字段 -->
-                            <textarea v-else-if="key === 'summary'" :value="value" rows="5" style="width: 100%;"
-                                @input="vueFileInfoValueChange(key, $event.target.value)"></textarea>
-                            <input v-else :value="value" type="text" style="width: 100%;"
-                                @input="vueFileInfoValueChange(key, $event.target.value)" />
-                        </div>
+                    <div class="form-group">
+                        <span v-for="item in resourceTagList" :key="item.id" class="btn-green btn-medium">
+                            {{ item.name }}
+                            <button @click="fnDelTagFromResource(item)" class="btn-small">❌</button>
+                        </span>
+                    </div>
+                </div>
+                <div class="form-container">
+                    <div class="form-group">
+                        <label class="input-label">所有的标签</label>
+                        <input v-model="tagSearchKey" placeholder="搜索标签" class="input-short" />
+                        <button @click="fnSearchTag" style="margin-left: 10px;" class="btn-blue btn-medium">搜索</button>
+                    </div>
+                    <div class="form-group">
+                        <span v-for="tag in displayTagList" :key="tag.id" class ="btn-medium" :class="fnIsResourseHaveTag(tag)?'btn-green' : 'btn-blue'">
+                            {{ tag.name }}
+                            <button @click="fnAddTagToResource(tag)" class="btn-small"
+                                :disabled="fnIsResourseHaveTag(tag)">✅</button>
+                        </span>
+                    </div>
+                    <div class="form-group">
+                        <input v-model="newTagName" placeholder="标签名称" class="input-short" />
+                        <input v-model="newTagDescription" placeholder="描述（可选）" class="input-short" />
+                        <button @click="fnCreateNewTag" class="btn-orange btn-medium">创建标签</button>
                     </div>
                 </div>
             </div>
@@ -89,43 +125,103 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, inject } from 'vue'
 import FileTreeNode from './FileTreeNode.vue'
 import { getNowDateTimeV2 } from '../util/time.js'
 
-const rootPath = localStorage.getItem('rootPath');
+// ---------------- 共用的东西 ----------------
+
+const vueShowInfo = inject('vueShowInfo')
+const vueShowError = inject('vueShowError')
+
+// -------------------------------- 共用的东西 --------------------------------
+
+// ---------------- 文件树 ----------------
+
+const rootDir = localStorage.getItem('rootDir');
 
 const rootNodeData = ref({
-    dirPath: rootPath,
+    dirPath: rootDir,
     name: '根目录',
     isDir: true,
     extname: '',
-    fullPath: rootPath,
+    fullPath: rootDir,
     children: [],
     childrenIsLoad: false
 })
 
-const rootPathIsScan = ref(false)
+const rootDirIsScan = ref(false)
 
-const vueScanRootPath = async function () {
-    // const thisFuncName = 'vueScanDir';
-
-    const result = await window.api.ipcScanDir(rootPath)
-
-    // console.log(thisFuncName, result)
+const fnScanRootDir = async function () {
+    const result = await window.api.ipcScanDir(rootDir)
 
     rootNodeData.value.children = result;
     rootNodeData.value.childrenIsLoad = true;
-    rootPathIsScan.value = true;
+    rootDirIsScan.value = true;
 
     beSelectNode.value = null;
-    fileInfo.value = null;
+    resourceInfo.value = null;
 }
 
-// 选中的文件树结点
+fnScanRootDir();
+
+// 被选中的文件树结点
 const beSelectNode = ref(null)
 
-const fileInfoDefault = {
+// 处理节点选中事件
+const fnTreeNodeBeSelect = async (nodeData) => {
+    beSelectNode.value = nodeData
+
+    await vueGetResourceInfo();
+
+    if (resourceInfo.value != null) {
+        await fnGetAllTag();
+        if (resourceInfo.value.id != 0) {
+            await fnGetResourceTag();
+        }
+    }
+}
+
+// -------------------------------- 文件树 --------------------------------
+
+// ---------------- 预览区域 ----------------
+
+// 可以预览的文件扩展名
+const canPreviewImageExtnameList = ['jpg', 'jpeg', 'png', 'gif'];
+const canPreviewVideoExtnameList = ['mp4'];
+const canPreviewExtnameList = [
+    ...canPreviewImageExtnameList,
+    ...canPreviewVideoExtnameList
+];
+
+// 是不是可以预览的文件
+const fnIsCanPreview = (nodeData) => {
+    if (nodeData == null || nodeData.isDir) {
+        return false;
+    }
+    return canPreviewExtnameList.includes(nodeData.extname?.toLowerCase());
+};
+
+// 是不是可以预览的图片
+const fnIsImageFile = (nodeData) => {
+    const extname = nodeData.extname != '' ? nodeData.extname.toLowerCase() : '';
+    return canPreviewImageExtnameList.includes(extname);
+};
+
+// 是不是可以预览的视频
+const fnIsVideoFile = (nodeData) => {
+    const extname = nodeData.extname != '' ? nodeData.extname.toLowerCase() : '';
+    return canPreviewVideoExtnameList.includes(extname);
+};
+
+// -------------------------------- 预览区域 --------------------------------
+
+// ---------------- 资源的信息 ----------------
+
+// 控制【资源的信息】可不可见
+const resourceInfoIsVisible = ref(true)
+
+const resourceInfoDefault = {
     id: 0,
     filename: '0',
     filetype: '0',
@@ -145,43 +241,10 @@ const fileInfoDefault = {
     update_at: 'CURRENT_TIMESTAMP',
 }
 
-const fileInfo = ref(null)
-
-// 处理节点选中事件
-const vueTreeNodeBeSelect = async (nodeData) => {
-    // const thisFuncName = 'vueTreeNodeBeSelect';
-
-    beSelectNode.value = nodeData
-    await vueQueryResourceInfo();
-}
-
-// 可以预览的文件类型
-const canPreviewImageExtnameList = ['jpg', 'jpeg', 'png', 'gif'];
-const canPreviewVideoExtnameList = ['mp4'];
-const canPreviewExtnameList = [...canPreviewImageExtnameList, ...canPreviewVideoExtnameList];
-
-// 是不是可以预览的文件
-const isCanPreviewFile = (node) => {
-    if (node == null || node.isDir) {
-        return false;
-    }
-    return canPreviewExtnameList.includes(node.extname?.toLowerCase());
-};
-
-// 是不是可以预览的图片
-const isImageFile = (node) => {
-    const extname = node.extname != '' ? node.extname.toLowerCase() : '';
-    return canPreviewImageExtnameList.includes(extname);
-};
-
-// 是不是可以预览的视频
-const isVideoFile = (node) => {
-    const extname = node.extname != '' ? node.extname.toLowerCase() : '';
-    return canPreviewVideoExtnameList.includes(extname);
-};
+const resourceInfo = ref(null)
 
 // 字段标签映射
-const fileInfoKeyNameMap = {
+const resourceInfoKeyNameMap = {
     id: 'ID',
     filename: '文件名',
     filetype: '文件类型',
@@ -203,118 +266,113 @@ const fileInfoKeyNameMap = {
     update_at: '修改时间'
 }
 // 获取字段标签
-const vueGetFileInfoKeyName = (key) => {
-    return fileInfoKeyNameMap[key] || key;
+const fnGetResourceInfoKeyName = (key) => {
+    if (resourceInfoKeyNameMap[key] != null) {
+        return resourceInfoKeyNameMap[key];
+    }
+    return key;
 }
 
 // 相当于【v-model】，让数据源和输入框同步
-const vueFileInfoValueChange = (key, value) => {
-    if (fileInfo.value) {
-        fileInfo.value[key] = value;
+const fnChangeResourceInfoValue = (key, value) => {
+    if (resourceInfo.value != null) {
+        resourceInfo.value[key] = value;
     }
 };
 
 const operateResult = ref(null)
 
-const vueShowError = (error) => {
+const vueOperateSuccess = (error) => {
+    operateResult.value = {
+        isSuccess: true,
+        message: '操作成功：' + error
+    };
+}
+
+const vueOperateFailed = (error) => {
     operateResult.value = {
         isSuccess: false,
         message: '操作失败：' + error
     };
 }
 
-const vueQueryResourceInfo = async () => {
-    // const thisFuncName = 'vueQueryResourceInfo';
-
+const vueGetResourceInfo = async () => {
     const nodeData = beSelectNode.value
     if (!nodeData.isDir) {
         try {
             const dbModel = { filename: nodeData.name }
-            const result = await window.api.ipcQueryResourceInfo(dbModel)
-            // console.log(thisFuncName, result)
-            fileInfo.value = { ...fileInfoDefault, ...result }
+            const result = await window.api.ipcGetResourceInfo(dbModel)
+            resourceInfo.value = { ...resourceInfoDefault, ...result }
         } catch (error) {
-            // console.error(thisFuncName, error)
-            vueShowError(error);
+            vueOperateFailed(error);
         }
     }
 };
 
-const vueQueryResourceInfoV2 = async () => {
-    // const thisFuncName = 'vueQueryResourceInfoV2';
-
+const vueGetResourceInfoV2 = async () => {
     const nodeData = beSelectNode.value
     if (!nodeData.isDir) {
         try {
             const dbModel = {
-                source: fileInfo.value.source,
-                resource_id: fileInfo.value.resource_id,
-                user_id: fileInfo.value.user_id,
+                source: resourceInfo.value.source,
+                resource_id: resourceInfo.value.resource_id,
+                user_id: resourceInfo.value.user_id,
             }
-            const result = await window.api.ipcQueryResourceInfoV2(dbModel)
-            // console.log(thisFuncName, result)
-            fileInfo.value = { ...fileInfoDefault, ...result }
+            const result = await window.api.ipcGetResourceInfoV2(dbModel)
+            resourceInfo.value = { ...resourceInfoDefault, ...result }
         } catch (error) {
-            // console.error(thisFuncName, error)
-            vueShowError(error);
+            vueOperateFailed(error);
         }
     }
 };
 
-// 新增保存文件信息功能
+// 保存资源的信息
 const vueSaveResourceInfo = async () => {
-    // const thisFuncName = 'vueSaveFileInfo';
-
-    if (fileInfo.value != null) {
+    if (resourceInfo.value != null) {
         try {
-            const argModel = { ...fileInfo.value }
+            const argModel = { ...resourceInfo.value }
             const result = await window.api.ipcSaveResourceInfo(argModel);
-            // console.log(thisFuncName, result);
             operateResult.value = {
                 isSuccess: true,
                 message: '操作成功：' + JSON.stringify(result)
             };
         } catch (error) {
-            // console.error(thisFuncName, error);
-            vueShowError(error);
+            vueOperateFailed(error);
         }
     }
 }
 
 // 构造【文件名】（资源的id_资源的下标_重命名时间）
 const vueMakeFilename = () => {
-    if (fileInfo.value == null) {
+    if (resourceInfo.value == null) {
         return;
     }
-    const resourceIndex = fileInfo.value.resource_index;
-    const resourceId = fileInfo.value.resource_id;
+    const resourceIndex = resourceInfo.value.resource_index;
+    const resourceId = resourceInfo.value.resource_id;
     const dateTime = getNowDateTimeV2()
     const newName = `${resourceId}_${resourceIndex}_${dateTime}`;
-    vueFileInfoValueChange('filename', newName);
+    fnChangeResourceInfoValue('filename', newName);
 };
 
 // 构造【资源的id】
 const vueMakeResourseId = () => {
-    if (fileInfo.value == null) {
+    if (resourceInfo.value == null) {
         return;
     }
     const dateTime = getNowDateTimeV2();
-    vueFileInfoValueChange('resource_id', dateTime);
+    fnChangeResourceInfoValue('resource_id', dateTime);
 };
 
 const vueSeeRenameFile = async () => {
-    // const thisFuncName = 'vueSeeRenameFile';
-
     if (beSelectNode.value == null) {
-        vueShowError('没有选中的文件树结点');
+        vueOperateFailed('没有选中的文件树结点');
         return;
     }
 
     try {
         const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
-        const argFileInfo = JSON.parse(JSON.stringify(fileInfo.value))
+        const argFileInfo = JSON.parse(JSON.stringify(resourceInfo.value))
         const result = await window.api.ipcSeeRenameFile(argBeSelectNode, argFileInfo);
-        // console.log(thisFuncName, result);
         const needRenameFileList = result.needRenameFileList;
         operateResult.value = {
             isSuccess: true,
@@ -322,7 +380,7 @@ const vueSeeRenameFile = async () => {
         };
     } catch (error) {
         // console.error(thisFuncName, error);
-        vueShowError(error);
+        vueOperateFailed(error);
     }
 }
 
@@ -330,15 +388,14 @@ const vueDoRenameFile = async () => {
     // const thisFuncName = 'vueDoRenameFile';
 
     if (beSelectNode.value == null) {
-        vueShowError('没有选中的文件树结点');
+        vueOperateFailed('没有选中的文件树结点');
         return;
     }
 
     try {
         const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
-        const argFileInfo = JSON.parse(JSON.stringify(fileInfo.value))
+        const argFileInfo = JSON.parse(JSON.stringify(resourceInfo.value))
         const result = await window.api.ipcDoRenameFile(argBeSelectNode, argFileInfo);
-        // console.log(thisFuncName, result);
         const dirPath = result.dirPath;
         const renameFileList = result.renameFileList;
         let message = '目录【' + dirPath + '】<br>'
@@ -350,24 +407,20 @@ const vueDoRenameFile = async () => {
             message: message
         };
     } catch (error) {
-        // console.error(thisFuncName, error);
-        vueShowError(error);
+        vueOperateFailed(error);
     }
 };
 
 const vueSeeMoveFile = async () => {
-    // const thisFuncName = 'vueSeeMoveFile';
-
     if (beSelectNode.value == null) {
-        vueShowError('没有选中的文件树结点或者资源信息不全');
+        vueOperateFailed('没有选中的文件树结点或者资源信息不全');
         return;
     }
 
     try {
         const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
-        const argFileInfo = JSON.parse(JSON.stringify(fileInfo.value))
+        const argFileInfo = JSON.parse(JSON.stringify(resourceInfo.value))
         const result = await window.api.ipcSeeMoveFile(argBeSelectNode, argFileInfo);
-        // console.log(thisFuncName, result);
         const dirPath = result.dirPath;
         const newDirPath = result.newDirPath;
         const needMoveFileList = result.needMoveFileList;
@@ -376,24 +429,20 @@ const vueSeeMoveFile = async () => {
             message: '以下文件：<br>' + needMoveFileList.join('<br>') + '<br>将被从目录：' + dirPath + '<br>移动到目录：' + newDirPath
         };
     } catch (error) {
-        // console.error(thisFuncName, error);
-        vueShowError(error);
+        vueOperateFailed(error);
     }
 }
 
 const vueDoMoveFile = async () => {
-    // const thisFuncName = 'vueDoMoveFile';
-
-    if (!beSelectNode.value || !fileInfo.value) {
-        vueShowError('没有选中的文件树结点或者资源信息不全');
+    if (!beSelectNode.value || !resourceInfo.value) {
+        vueOperateFailed('没有选中的文件树结点或者资源信息不全');
         return;
     }
 
     try {
         const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
-        const argFileInfo = JSON.parse(JSON.stringify(fileInfo.value))
+        const argFileInfo = JSON.parse(JSON.stringify(resourceInfo.value))
         const result = await window.api.ipcDoMoveFile(argBeSelectNode, argFileInfo);
-        // console.log(thisFuncName, result);
         const moveFileList = result.moveFileList;
         let message = ''
         for (const item of moveFileList) {
@@ -404,8 +453,168 @@ const vueDoMoveFile = async () => {
             message: message
         };
     } catch (error) {
-        // console.error(thisFuncName, error);
-        vueShowError(error);
+        vueOperateFailed(error);
     }
 };
+
+// -------------------------------- 资源的信息 --------------------------------
+
+// ---------------- 标签的信息 ----------------
+
+const resourceTagIsVisible = ref(true);
+
+const allTagList = ref([]); // 所有的标签
+const resourceTagList = ref([]); // 资源的标签
+const displayTagList = ref([]); // 显示的标签
+const tagSearchKey = ref(''); // 标签搜索关键词
+const newTagName = ref(''); // 标签名称
+const newTagDescription = ref(''); // 标签描述
+
+// 获取所有的标签
+const fnGetAllTag = async () => {
+    try {
+        const result = await window.api.ipcGetAllTag();
+        allTagList.value = result;
+        displayTagList.value = result;
+    } catch (err) {
+        vueShowError(err)
+    }
+};
+
+// 获取资源的标签
+const fnGetResourceTag = async () => {
+    try {
+        const resourceId = resourceInfo.value.id
+        const result = await window.api.ipcGetResourceTag(resourceId);
+        resourceTagList.value = result;
+    } catch (err) {
+       vueShowError(err);
+    }
+};
+
+
+
+// 创建新标签
+const fnCreateNewTag = async () => {
+    if (newTagName.value == null || newTagName.value.trim() == '' || newTagName.value.trim() == '0') {
+        vueShowError(new Error('标签名称不能为空'));
+        return;
+    }
+
+    try {
+        const argDbModel = {
+            name: newTagName.value.trim(),
+            description: '0'
+        }
+        if (newTagDescription.value != null && newTagDescription.value.trim() != '') {
+            argDbModel.description = newTagDescription.value.trim()
+        }
+        await window.api.ipcCreateTag(argDbModel);
+
+        newTagName.value = '';
+        newTagDescription.value = '';
+
+        fnGetAllTag();
+    } catch (err) {
+        vueShowError(err);
+    }
+};
+
+
+// 给资源添加标签
+const fnAddTagToResource = (tag) => {
+    if (!fnIsResourseHaveTag(tag)) {
+        resourceTagList.value.push(tag);
+    }
+};
+
+// 给资源删除标签
+const fnDelTagFromResource = (tag) => {
+    const index = resourceTagList.value.findIndex((item) => {
+        return item.id === tag.id
+    });
+    if (index !== -1) {
+        resourceTagList.value.splice(index, 1);
+    }
+};
+
+// 保存资源标签
+const fnSaveResourceTag = async () => {
+    try {
+        const resourceId = resourceInfo.value.id;
+        const tagIdList = resourceTagList.value.map((item) => {
+            return item.id;
+        });
+        await window.api.ipcSaveResourceTag(resourceId, tagIdList);
+
+        fnGetResourceTag();
+    } catch (err) {
+        vueShowError(err);
+    }
+};
+
+// 资源是否有某个标签
+const fnIsResourseHaveTag = (tag) => {
+    return resourceTagList.value.some((item) => {
+        return item.id === tag.id
+    });
+};
+
+// 搜索标签
+const fnSearchTag = () => {
+    if (tagSearchKey.value.trim() == '') {
+        displayTagList.value = allTagList.value;
+    } else {
+        displayTagList.value = allTagList.value.filter((item) => {
+            return item.name.toLowerCase().includes(tagSearchKey.value.toLowerCase());
+        });
+    }
+};
+
+// -------------------------------- 标签的信息 --------------------------------
 </script>
+
+<style scoped>
+.browser {
+    width: 1600px;
+    height: 850px;
+    display: flex;
+}
+
+.file-tree {
+    width: 600px;
+    height: 850px;
+    overflow: scroll;
+    direction: rtl;
+}
+
+.file-tree>* {
+    direction: ltr;
+}
+
+.resource-info {
+    width: 1000px;
+    height: 850px;
+    overflow: scroll;
+}
+
+.preview-container {
+    max-width: 900px;
+    max-height: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.preview-img {
+    max-width: 900px;
+    max-height: 400px;
+    object-fit: contain;
+}
+
+.preview-video {
+    max-width: 900px;
+    max-height: 400px;
+    object-fit: contain;
+}
+</style>

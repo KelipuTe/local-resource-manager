@@ -18,4 +18,4 @@
 | visit_at      | text | 我最后一次访问资源的时间                                                     |
 | visit_times   | int  | 我访问资源的总次数                                                             |
 | create_at     | text | 创建时间                                                                   |
-| update_at     | text | 修改时间                                                                   |
+| update_at     | text | 更新时间                                                                   |

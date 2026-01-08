@@ -1,5 +1,6 @@
 const { getNowDateTime } = require('../util/time.cjs');
-const { dbTextDefaultValue, dbTextDefaultValueNowTime } = require('./config.cjs');
+
+const { config } = require('./config.cjs');
 const { dbCreateBySave } = require('./create_by.cjs');
 
 let dbConn;
@@ -8,30 +9,32 @@ function dbSetDbConn(conn) {
     dbConn = conn;
 }
 
+// 【resource 表】的模型
 const dbResourceModelDefault = {
     id: 0,
-    filename: dbTextDefaultValue,
-    filetype: dbTextDefaultValue,
-    source: dbTextDefaultValue,
-    resource_id: dbTextDefaultValue,
+    filename: config.dbTextDefaultValue,
+    filetype: config.dbTextDefaultValue,
+    source: config.dbTextDefaultValue,
+    resource_id: config.dbTextDefaultValue,
     resource_index: 1,
-    user_id: dbTextDefaultValue,
-    resource_name: dbTextDefaultValue,
-    ext_info: dbTextDefaultValue,
-    publish_at: dbTextDefaultValue,
-    key_point: dbTextDefaultValue,
-    summary: dbTextDefaultValue,
+    user_id: config.dbTextDefaultValue,
+    resource_name: config.dbTextDefaultValue,
+    ext_info: config.dbTextDefaultValue,
+    publish_at: config.dbTextDefaultValue,
+    key_point: config.dbTextDefaultValue,
+    summary: config.dbTextDefaultValue,
     status: 1,
-    visit_at: dbTextDefaultValueNowTime,
+    visit_at: config.dbTextDefaultValueNowTime,
     visit_times: 1,
-    create_at: dbTextDefaultValueNowTime,
-    update_at: dbTextDefaultValueNowTime,
+    create_at: config.dbTextDefaultValueNowTime,
+    update_at: config.dbTextDefaultValueNowTime,
 };
 
+// 【resource 表】和【create_by 表】的混合模型
 const dbResourceAndCreateByModelDefault = {
     ...dbResourceModelDefault,
-    username: dbTextDefaultValue,
-    user_ext_info: dbTextDefaultValue,
+    username: config.dbTextDefaultValue,
+    user_ext_info: config.dbTextDefaultValue,
 };
 
 /** 
@@ -133,8 +136,8 @@ function dbResourceInsert(dbMixModel) {
             dbConn.run('BEGIN TRANSACTION');
             dbConn.run(sql, values, function (err) {
                 if (err != null) {
-                    console.error(thisFuncName, err.message);
                     dbConn.run('ROLLBACK');
+                    console.error(thisFuncName, err.message);
                     reject(err.message);
                     return;
                 }
@@ -146,10 +149,10 @@ function dbResourceInsert(dbMixModel) {
                         dbConn.run('COMMIT');
                         resolve({ id: resourceId });
                     })
-                    .catch(saveErr => {
-                        console.error(thisFuncName, saveErr);
+                    .catch(err02 => {
                         dbConn.run('ROLLBACK');
-                        reject(saveErr);
+                        console.error(thisFuncName, err02);
+                        reject(err02);
                     });
             });
         });

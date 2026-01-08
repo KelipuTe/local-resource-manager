@@ -1,5 +1,6 @@
 const { getNowDateTime } = require('../util/time.cjs');
-const { dbTextDefaultValue, dbTextDefaultValueNowTime } = require('./config.cjs');
+
+const { config } = require('./config.cjs');
 
 let dbConn;
 
@@ -7,15 +8,16 @@ function dbSetDbConn(conn) {
     dbConn = conn;
 }
 
+// 【create_by 表】的模型
 const dbCreateByModelDefault = {
     id: 0,
-    source: dbTextDefaultValue,
-    user_id: dbTextDefaultValue,
-    username: dbTextDefaultValue,
-    ext_info: dbTextDefaultValue,
-    same_as: dbTextDefaultValue,
-    create_at: dbTextDefaultValueNowTime,
-    update_at: dbTextDefaultValueNowTime,
+    source: config.dbTextDefaultValue,
+    user_id: config.dbTextDefaultValue,
+    username: config.dbTextDefaultValue,
+    ext_info: config.dbTextDefaultValue,
+    same_as: config.dbTextDefaultValue,
+    create_at: config.dbTextDefaultValueNowTime,
+    update_at: config.dbTextDefaultValueNowTime,
 };
 
 /**
@@ -52,7 +54,7 @@ function dbCreateBySave(dbMixModel) {
                 if (username != row.username) {
                     const nowDateTime = getNowDateTime();
                     const addExtInfo = `${nowDateTime}，从【${row.username}】修改为【${username}】；`;
-                    if (newExtInfo == dbTextDefaultValue) {
+                    if (newExtInfo == config.dbTextDefaultValue) {
                         newExtInfo = addExtInfo;
                     } else {
                         newExtInfo = newExtInfo + addExtInfo;

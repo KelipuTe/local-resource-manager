@@ -1,4 +1,5 @@
-// import './assets/main.css'
+import './assets/style/form.css'
+import './assets/style/button.css'
 
 import { createApp } from 'vue'
 import App from './App.vue'

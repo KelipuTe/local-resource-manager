@@ -1,10 +1,15 @@
 const { app, BrowserWindow } = require('electron/main');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
+
 const { config } = require('./util/config.cjs');
+
 const { dbSetDbConn: dbSetDbConnResource } = require('./database/resource.cjs');
 const { dbSetDbConn: dbSetDbConnCreateBy } = require('./database/create_by.cjs');
+const { dbSetDbConn: dbSetDbConnTag } = require('./database/tag.cjs');
+
 const { fsSetMainWindow } = require('./nodejs/fs.cjs');
+
 const { ipcRegisterHandler } = require('./ipcHandler.cjs');
 
 process.env.CHARSET = 'UTF-8';
@@ -21,6 +26,7 @@ const dbConn = new sqlite3.Database(config.dbFullPath, (err) => {
 
 dbSetDbConnResource(dbConn);
 dbSetDbConnCreateBy(dbConn);
+dbSetDbConnTag(dbConn);
 
 // -------------------------------- 数据库 --------------------------------
 
@@ -51,7 +57,9 @@ const createWindow = () => {
 
 app.whenReady().then(async () => {
     createWindow();
+
     ipcRegisterHandler();
+
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
             createWindow();

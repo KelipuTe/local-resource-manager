@@ -1,0 +1,49 @@
+.form-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.form-group {
+    padding: 5px;
+    gap: 5px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.input-long{
+    width: 600px;
+    padding: 8px 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+    font-size: 16px;
+    color: #333;
+}
+
+.input-medium {
+    width: 400px;
+    padding: 8px 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+    font-size: 16px;
+    color: #333;
+}
+
+.input-short {
+    width: 200px;
+    padding: 8px 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+    font-size: 16px;
+    color: #333;
+}
+
+.input-label {
+    width: 200px;
+    font-weight: bold;
+    color: #333;
+}
