@@ -1,7 +1,7 @@
 const { getNowDateTime } = require('../util/time.cjs');
 
 const { config } = require('./config.cjs');
-const { dbCreateBySave } = require('./create_by.cjs');
+const { logSqlLog } = require('../util/log.cjs');
 
 let dbConn;
 
@@ -30,35 +30,23 @@ const dbResourceModelDefault = {
     update_at: config.dbTextDefaultValueNowTime,
 };
 
-// 【resource 表】和【create_by 表】的混合模型
-const dbResourceAndCreateByModelDefault = {
-    ...dbResourceModelDefault,
-    username: config.dbTextDefaultValue,
-    user_ext_info: config.dbTextDefaultValue,
-};
-
 /** 
  * 查询资源信息（通过，文件名）
  * @param dbModel dbResourceModelDefault
  * @returns
- * reject(Object)。dbResourceAndCreateByModelDefault。
- * resolve(string)。报错信息。
+ * reject(Object) dbResourceModelDefault
+ * resolve(string) 报错信息
  */
 async function dbResourceSelect(dbModel) {
     const thisFuncName = 'dbResourceSelect';
 
-    const sql = `
-SELECT r.*, c.username AS username, c.ext_info AS user_ext_info
-FROM \`resource\` AS r LEFT JOIN \`create_by\` AS c 
-ON r.user_id = c.user_id AND r.source = c.source
-WHERE r.filename = ? 
-LIMIT 1;`;
+    const sql = `SELECT * FROM \`resource\` WHERE filename = ? LIMIT 1;`;
 
     const filename = dbModel.filename;
     const basename = filename.split('.').slice(0, -1).join('.');
     const valueList = [basename];
 
-    console.log(thisFuncName, sql, valueList);
+    logSqlLog(thisFuncName, sql, valueList)
 
     return new Promise((resolve, reject) => {
         dbConn.get(sql, valueList, (err, row) => {
@@ -73,25 +61,21 @@ LIMIT 1;`;
 }
 
 /** 
- * 查询资源信息（通过，资源id、资源所属用户的id、资源的来源）
+ * 查询资源的数据（通过：来源、资源的id）
  * @param dbModel dbResourceModelDefault
  * @returns
- * reject(Object)。dbResourceAndCreateByModelDefault。
- * resolve(string)。报错信息。
+ * reject(Object) dbResourceModelDefault
+ * resolve(string) 报错信息
  */
 async function dbResourceSelectV2(dbModel) {
     const thisFuncName = 'dbResourceSelectV2';
 
-    const sql = `
-SELECT r.*, c.username AS username, c.ext_info AS user_ext_info 
-FROM \`resource\` AS r LEFT JOIN \`create_by\` AS c 
-ON r.user_id = c.user_id AND r.source = c.source 
-WHERE r.resource_id = ? AND r.user_id = ? AND r.source = ? 
-LIMIT 1;`;
-    const { resource_id, user_id, source } = dbModel;
-    const valueList = [resource_id, user_id, source];
+    const sql = `SELECT * FROM \`resource\` WHERE resource_id = ? AND source = ? LIMIT 1;`;
 
-    console.log(thisFuncName, sql, valueList);
+    const { resource_id, source } = dbModel;
+    const valueList = [resource_id, source];
+
+    logSqlLog(thisFuncName, sql, valueList)
 
     return new Promise((resolve, reject) => {
         dbConn.get(sql, valueList, (err, row) => {
@@ -106,117 +90,84 @@ LIMIT 1;`;
 }
 
 /** 
- * 新增资源信息
- * 会更新【resource 表】和【create_by 表】
- * @param dbMixModel dbResourceAndCreateByModelDefault
+ * 新增资源的数据
+ * @param dbMixModel dbResourceModelDefault
  * @returns
- * reject(Object)。{resourceId: int, createById: int}。
- * resolve(string)。报错信息。
+ * reject(Object) {id: int}
+ * resolve(string) 报错信息
  */
 function dbResourceInsert(dbMixModel) {
     const thisFuncName = 'dbResourceInsert';
 
-    // 排除【不需要更新的字段】和【【create_by 表】的字段】
-    const { id, visit_at, visit_times, create_at, update_at,
-        username, user_ext_info, ...insertData } = dbMixModel;
+    // 排除【不需要更新的字段】
+    const { id, visit_at, visit_times, create_at, update_at, ...insertData } = dbMixModel;
 
     const keyList = Object.keys(insertData);
-    const placeholderList = keyList.map(() => {
-        return '?';
-    });
     const keyStr = keyList.join(', ');
+    const placeholderList = keyList.map(() => { return '?'; });
     const placeholderStr = placeholderList.join(', ');
     const sql = `INSERT INTO \`resource\` (${keyStr}) VALUES (${placeholderStr});`;
-    const values = [...Object.values(insertData)];
 
-    console.log(thisFuncName, sql, values);
+    const valueList = [...Object.values(insertData)];
+
+    logSqlLog(thisFuncName, sql, valueList)
 
     return new Promise((resolve, reject) => {
-        dbConn.serialize(() => {
-            dbConn.run('BEGIN TRANSACTION');
-            dbConn.run(sql, values, function (err) {
-                if (err != null) {
-                    dbConn.run('ROLLBACK');
-                    console.error(thisFuncName, err.message);
-                    reject(err.message);
-                    return;
-                }
-
-                const resourceId = this.lastID;
-
-                dbCreateBySave(dbMixModel)
-                    .then(() => {
-                        dbConn.run('COMMIT');
-                        resolve({ id: resourceId });
-                    })
-                    .catch(err02 => {
-                        dbConn.run('ROLLBACK');
-                        console.error(thisFuncName, err02);
-                        reject(err02);
-                    });
-            });
+        dbConn.run(sql, valueList, function (err) {
+            if (err != null) {
+                console.error(thisFuncName, err.message);
+                reject(err.message);
+                return;
+            }
+            resolve({ id: this.lastID });
         });
     });
 }
 
 /** 
- * 更新资源信息
- * 会更新【resource 表】和【create_by 表】
- * @param dbMixModel dbResourceAndCreateByModelDefault
+ * 修改资源的数据
+ * @param dbModel dbResourceModelDefault
  * @returns
- * reject(Object)。{resourceId: int, createById: int}。
- * resolve(string)。报错信息。
+ * reject(Object) {id: int}
+ * resolve(string) 报错信息
  */
-function dbResourceUpdate(dbMixModel) {
+function dbResourceUpdate(dbModel) {
     const thisFuncName = 'dbResourceUpdate';
 
-    // 排除【不需要更新的字段】和【【create_by 表】的字段】
-    const { id, visit_at, visit_times, create_at, update_at,
-        username, user_ext_info, ...updateData } = dbMixModel;
+    // 排除【不需要更新的字段】
+    const { id, visit_at, visit_times, create_at, update_at, ...updateData } = dbModel;
 
-    dbMixModel.update_at = getNowDateTime();
+    dbModel.update_at = getNowDateTime();
+
     const keyList = Object.keys(updateData);
     const setClause = keyList.map(key => `${key} = ?`).join(', ');
     const sql = `UPDATE \`resource\` SET ${setClause} WHERE id = ?;`;
-    const values = [...Object.values(updateData), id];
 
-    console.log(thisFuncName, sql, values);
+    const valueList = [...Object.values(updateData), id];
+
+    logSqlLog(thisFuncName, sql, valueList)
 
     return new Promise((resolve, reject) => {
-        dbConn.serialize(() => {
-            dbConn.run('BEGIN TRANSACTION');
-            dbConn.run(sql, values, function (err) {
-                if (err != null) {
-                    console.error(thisFuncName, err.message);
-                    dbConn.run('ROLLBACK');
-                    reject(err.message);
-                    return;
-                }
-
-                dbCreateBySave(dbMixModel)
-                    .then(() => {
-                        dbConn.run('COMMIT');
-                        resolve({ changes: this.changes });
-                    })
-                    .catch(saveErr => {
-                        console.error(thisFuncName, saveErr);
-                        dbConn.run('ROLLBACK');
-                        reject(saveErr);
-                    });
-            });
+        dbConn.run(sql, valueList, (err) => {
+            if (err != null) {
+                console.error(thisFuncName, err.message);
+                reject(err.message);
+                return;
+            }
+            resolve({ id: id });
         });
     });
 }
 
 /**
- * 查询资源信息（通过文件名）
+ * 查询资源的数据（通过：文件名）
  * @param dbModel dbResourceModelDefault
  * @returns
- * reject(Object)。dbResourceAndCreateByModelDefault。
- * resolve(string)。报错信息。
+ * reject(Object) dbResourceModelDefault
+ * resolve(string) 报错信息
  */
 async function dbResourceQuery(dbModel) {
-    let returnData = { ...dbResourceAndCreateByModelDefault };
+    let returnData = { ...dbResourceModelDefault };
     result = await dbResourceSelect(dbModel);
     if (result != null) {
         returnData = { ...returnData, ...result };
@@ -225,14 +176,14 @@ async function dbResourceQuery(dbModel) {
 }
 
 /**
- * 查询资源信息（通过资源信息）
+ * 查询资源的数据（通过：来源、资源的id）
  * @param dbModel dbResourceModelDefault
  * @returns
- * reject(Object)。dbResourceAndCreateByModelDefault。
- * resolve(string)。报错信息。
+ * reject(Object) dbResourceModelDefault
+ * resolve(string) 报错信息
  */
 async function dbResourceQueryV2(dbModel) {
-    let returnData = { ...dbResourceAndCreateByModelDefault };
+    let returnData = { ...dbResourceModelDefault };
     result = await dbResourceSelectV2(dbModel);
     if (result != null) {
         returnData = { ...returnData, ...result };
@@ -242,23 +193,23 @@ async function dbResourceQueryV2(dbModel) {
 
 /**
  * 保存资源信息（不存在就插入，存在就修改）
- * @param dbMixModel dbResourceAndCreateByModelDefault
+ * @param dbModel dbResourceModelDefault
  * @returns
- * reject(Object)。{resourceId: int, createById: int}。
- * resolve(string)。报错信息。
+ * reject(Object) {id: int}
+ * resolve(string) 报错信息
  */
-async function dbResourceSave(dbMixModel) {
-    let returnData = { ...dbResourceAndCreateByModelDefault };
-    if (dbMixModel.id == 0) {
-        returnData = await dbResourceInsert(dbMixModel);
+async function dbResourceSave(dbModel) {
+    let returnData = { id: 0 };
+    if (dbModel.id == 0) {
+        returnData = await dbResourceInsert(dbModel);
     } else {
-        returnData = await dbResourceUpdate(dbMixModel);
+        returnData = await dbResourceUpdate(dbModel);
     }
     return returnData;
 }
 
 module.exports = {
-    dbResourceAndCreateByModelDefault,
+    dbResourceModelDefault,
     dbSetDbConn,
     dbResourceQuery,
     dbResourceQueryV2,

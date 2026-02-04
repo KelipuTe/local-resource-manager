@@ -1,6 +1,7 @@
 const { getNowDateTime } = require('../util/time.cjs');
 
 const { config } = require('./config.cjs');
+const { logSqlLog } = require('../util/log.cjs');
 
 let dbConn;
 
@@ -21,82 +22,138 @@ const dbCreateByModelDefault = {
 };
 
 /**
- * 保存资源所属用户信息（不存在就插入，存在就修改）
- * @param dbMixModel dbResourceAndCreateByModelDefault
+ * 查询资源所属用户的数据（通过：来源、id）
+ * @param dbModel dbCreateByModelDefault
  * @returns
- * reject(Object)。{createById: int}。
- * resolve(string)。报错信息。
+ * reject(Object) dbCreateByModelDefault
+ * resolve(string) 报错信息
  */
-function dbCreateBySave(dbMixModel) {
-    const thisFuncName = 'dbCreateBySave';
-
-    const { source, user_id, username } = dbMixModel;
-
-    if (source == null || user_id == null) {
-        return Promise.resolve();
-    }
+function dbCreateBySelect(dbModel) {
+    const thisFuncName = 'dbCreateBySelect';
 
     return new Promise((resolve, reject) => {
-        const selectSql = `SELECT * FROM \`create_by\` WHERE source = ? AND user_id = ?;`;
-        const selectValues = [source, user_id];
+        const sql = `SELECT * FROM \`create_by\` WHERE  user_id = ? AND source = ?;`;
 
-        console.log(thisFuncName, selectSql, selectValues);
+        const { user_id, source } = dbModel;
+        const valueList = [user_id, source];
 
-        dbConn.get(selectSql, selectValues, (err, row) => {
+        logSqlLog(thisFuncName, sql, valueList)
+
+        dbConn.get(sql, valueList, (err, row) => {
             if (err != null) {
                 console.error(thisFuncName, err.message);
                 reject(err.message);
                 return;
-            }
-
-            if (row != null) {
-                let newExtInfo = row.ext_info
-                if (username != row.username) {
-                    const nowDateTime = getNowDateTime();
-                    const addExtInfo = `${nowDateTime}，从【${row.username}】修改为【${username}】；`;
-                    if (newExtInfo == config.dbTextDefaultValue) {
-                        newExtInfo = addExtInfo;
-                    } else {
-                        newExtInfo = newExtInfo + addExtInfo;
-                    }
-                }
-
-                const updateSql = `UPDATE \`create_by\` 
-SET username = ?, ext_info = ?, update_at = CURRENT_TIMESTAMP 
-WHERE id = ?;`;
-                const updateValues = [username, newExtInfo, row.id];
-                console.log(updateSql, updateValues);
-
-                dbConn.run(updateSql, updateValues, (updateErr) => {
-                    if (updateErr != null) {
-                        console.error(thisFuncName, updateErr.message);
-                        reject(updateErr.message);
-                        return;
-                    }
-                    resolve();
-                });
             } else {
-                const insertSql = `
-INSERT INTO \`create_by\` (source, user_id, username, create_at, update_at) 
-VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`;
-                const insertValues = [source, user_id, username];
-                console.log(insertSql, insertValues);
-
-                dbConn.run(insertSql, insertValues, (insertErr) => {
-                    if (insertErr != null) {
-                        console.error(thisFuncName, insertErr.message);
-                        reject(insertErr.message);
-                        return;
-                    }
-                    resolve();
-                });
+                resolve(row);
             }
         });
     });
 }
 
+/**
+ * 新增资源所属用户的数据
+ * @param dbModel dbCreateByModelDefault
+ * @returns
+ * reject(Object) {id: int}
+ * resolve(string) 报错信息
+ */
+function dbCreateByInsert(dbModel) {
+    const thisFuncName = 'dbCreateByInsert';
+
+    return new Promise((resolve, reject) => {
+        const sql = `INSERT INTO 
+\`create_by\` (source, user_id, username, create_at, update_at) 
+VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`;
+
+        const { source, user_id, username } = dbModel;
+        const valueList = [source, user_id, username];
+
+        logSqlLog(thisFuncName, sql, valueList)
+
+        dbConn.run(sql, valueList, function(err)  {
+            if (err != null) {
+                console.error(thisFuncName, err.message);
+                reject(err.message);
+                return;
+            }
+            resolve({ id: this.lastID });
+        });
+    });
+}
+
+/**
+ * 修改资源所属用户的数据
+ * @param dbModel dbCreateByModelDefault
+ * @returns
+ * reject(Object) {id: int}
+ * resolve(string) 报错信息
+ */
+function dbCreateByUpdate(dbModel) {
+    const thisFuncName = 'dbCreateByUpdate';
+
+    return new Promise((resolve, reject) => {
+        const sql = `UPDATE \`create_by\` 
+SET username = ?, ext_info = ?, update_at = CURRENT_TIMESTAMP 
+WHERE id = ?;`;
+
+        const { username, ext_info, id } = dbModel;
+        const valueList = [username, ext_info, id];
+
+        logSqlLog(thisFuncName, sql, valueList)
+
+        dbConn.run(sql, valueList, (err) => {
+            if (err != null) {
+                console.error(thisFuncName, err.message);
+                reject(err.message);
+                return;
+            }
+            resolve({ id: id });
+        });
+    })
+}
+
+/**
+ * 查询资源所属用户数据（通过：来源、id）
+ * @param dbModel dbCreateByModelDefault
+ * @returns
+ * reject(Object) dbCreateByModelDefault
+ * resolve(string) 报错信息
+ */
+async function dbCreateByQuery(dbModel) {
+    let returnData = { ...dbCreateByModelDefault };
+    result = await dbCreateBySelect(dbModel);
+    if (result != null) {
+        returnData = { ...returnData, ...result };
+    }
+    return returnData;
+}
+
+/**
+ * 保存资源所属用户的数据（不存在就插入，存在就修改）
+ * @param dbModel dbCreateByModelDefault
+ * @returns
+ * reject(Object) {id: int}
+ * resolve(string) 报错信息
+ */
+async function dbCreateBySave(dbModel) {
+    const result = await dbCreateBySelect(dbModel);
+    if (result != null) {
+        dbModel.ext_info = result.ext_info;
+        if (dbModel.username != result.username) {
+            const nowDateTime = getNowDateTime();
+            const addExtInfo = `${nowDateTime}，从【${result.username}】修改为【${dbModel.username}】；`;
+            dbModel.ext_info = dbModel.ext_info + addExtInfo;
+        }
+        return await dbCreateByUpdate(dbModel);
+    } else {
+        return await dbCreateByInsert(dbModel);
+    }
+}
+
 module.exports = {
     dbCreateByModelDefault,
     dbSetDbConn,
+    dbCreateByQuery,
     dbCreateBySave
 };

@@ -1,4 +1,5 @@
 const { config } = require('./config.cjs');
+const { logSqlLog } = require('../util/log.cjs');
 
 let dbConn;
 
@@ -31,7 +32,7 @@ function dbTagQueryAll() {
 
     const sql = `SELECT * FROM \`tag\` ORDER BY id DESC`;
 
-    console.log(thisFuncName, sql);
+    logSqlLog(thisFuncName, sql, [])
 
     return new Promise((resolve, reject) => {
         dbConn.all(sql, [], (err, rows) => {
@@ -54,12 +55,12 @@ function dbResourceTagQuery(resourceId) {
     const thisFuncName = 'dbResourceTagQuery';
 
     const sql = `SELECT t.* 
-FROM \`resource_tag\` AS rt INNER JOIN \`tag\` AS t ON rt.tag_id = t.id
+FROM \`resource_tag\` AS rt INNER JOIN \`tag\` AS t ON rt.tag_id = t.id 
 WHERE rt.resource_id = ? 
 ORDER BY t.id DESC`;
     const valueList = [resourceId];
 
-    console.log(thisFuncName, sql, valueList);
+    logSqlLog(thisFuncName, sql, valueList)
 
     return new Promise((resolve, reject) => {
         dbConn.all(sql, valueList, (err, rows) => {
@@ -86,11 +87,11 @@ function dbTagCreate(dbModel) {
 
     const { name, description } = dbModel;
 
-    const sql = `INSERT INTO tag (name, description, create_at, update_at)
+    const sql = `INSERT INTO tag (name, description, create_at, update_at) 
 VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
     const valueList = [name, description];
 
-    console.log(thisFuncName, sql, valueList);
+    logSqlLog(thisFuncName, sql, valueList)
 
     return new Promise((resolve, reject) => {
         dbConn.run(sql, valueList, function (err) {
@@ -120,7 +121,8 @@ function dbResourceTagSave(resourceId, tagIdList) {
             // 先删除旧的标签
             const delSql = `DELETE FROM \`resource_tag\` WHERE resource_id = ?`;
             const delValueList = [resourceId];
-            console.log(thisFuncName, delSql, delValueList);
+            
+            logSqlLog(thisFuncName, delSql, delValueList)
 
             dbConn.run(delSql, delValueList, (err) => {
                 if (err != null) {
@@ -138,13 +140,14 @@ function dbResourceTagSave(resourceId, tagIdList) {
                 }
 
                 // 添加新的标签
-                const insertSql = `INSERT INTO \`resource_tag\` (resource_id, tag_id, create_at)
+                const insertSql = `INSERT INTO \`resource_tag\` (resource_id, tag_id, create_at) 
 VALUES (?, ?, CURRENT_TIMESTAMP)`;
 
                 let insertNum = 0;
                 tagIdList.forEach((item) => {
                     const insertValueList = [resourceId, item];
-                    console.log(thisFuncName, insertSql, insertValueList);
+
+                    logSqlLog(thisFuncName, insertSql, insertValueList)
 
                     dbConn.run(insertSql, insertValueList, (err02) => {
                         if (err02 != null) {

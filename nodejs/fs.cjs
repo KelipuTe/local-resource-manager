@@ -33,11 +33,11 @@ async function fsSelectDir(options) {
 
 /** 
  * 扫描目录 
- * @param dirPath 所属目录的路径。
+ * @param dirPath 所属目录的路径
  * @returns 
- * name。目录名或者文件名。
- * extname。文件扩展名。
- * fullPath。目录的全路径或者文件的全路径。
+ * name 目录名或者文件名
+ * extname 文件扩展名
+ * fullPath 目录的全路径或者文件的全路径
  */
 async function fsScanDir(dirPath) {
     // fs.readdir()。返回，目录下的目录和文件列表。
@@ -72,10 +72,10 @@ async function fsScanDir(dirPath) {
 
 /**
  * 重命名文件（预览）
- * @param {Object} nodeData 被选中的结点
- * @param {Object} dbMixModel dbResourceAndCreateByModel
+ * @param nodeData 被选中的结点
+ * @param dbModel dbResourceModelDefault
  */
-async function fsSeeRenameFile(nodeData, dbMixModel) {
+async function fsSeeRenameFile(nodeData, dbModel) {
     const dirPath = nodeData.dirPath;
 
     // path.parse().name。获取文件名（不带文件扩展名）。
@@ -99,13 +99,15 @@ async function fsSeeRenameFile(nodeData, dbMixModel) {
 
 /**
  * 重命名文件（执行）
+ * @param nodeData 被选中的结点
+ * @param dbModel dbResourceModelDefault
  * 重命名规则。资源id_资源index_重命名时间
  */
-async function fsDoRenameFile(nodeData, dbMixModel) {
+async function fsDoRenameFile(nodeData, dbModel) {
     const dirPath = nodeData.dirPath;
-    const newBaseName = dbMixModel.filename;
+    const newBaseName = dbModel.filename;
 
-    const result = await fsSeeRenameFile(nodeData, dbMixModel);
+    const result = await fsSeeRenameFile(nodeData, dbModel);
     const needRenameFileList = result.needRenameFileList;
 
     const renameFileList = [];
@@ -137,16 +139,18 @@ async function fsDoRenameFile(nodeData, dbMixModel) {
 
 /**
  * 归档文件（预览）
+ * @param nodeData 被选中的结点
+ * @param dbModel dbResourceModelDefault
  * 归档目录规则。根目录\分类目录\资源的发布时间\资源的来源\资源所属用户的id\资源的id\
  */
-async function fsSeeMoveFile(nodeData, dbMixModel) {
+async function fsSeeMoveFile(nodeData, dbModel) {
     const dirPath = nodeData.dirPath
-    const baseName = dbMixModel.filename
-    const source = dbMixModel.source;
-    const userId = dbMixModel.user_id;
-    const resourceId = dbMixModel.resource_id;
-    const publishAt = dbMixModel.publish_at;
-    const keyPoint = dbMixModel.key_point;
+    const baseName = dbModel.filename
+    const source = dbModel.source;
+    const userId = dbModel.user_id;
+    const resourceId = dbModel.resource_id;
+    const publishAt = dbModel.publish_at;
+    const keyPoint = dbModel.key_point;
 
     // 分类目录
     if (keyPoint == null || keyPoint == dbConfig.dbTextDefaultValue) {
@@ -182,10 +186,12 @@ async function fsSeeMoveFile(nodeData, dbMixModel) {
 
 /**
  * 归档文件（执行）
+ * @param nodeData 被选中的结点
+ * @param dbModel dbResourceModelDefault
  * 归档目录规则。根目录\分类目录\资源的发布时间\资源的来源\资源所属用户的id\资源的id\
  */
-async function fsDoMoveFile(nodeData, dbMixModel) {
-    const result = await fsSeeMoveFile(nodeData, dbMixModel);
+async function fsDoMoveFile(nodeData, dbModel) {
+    const result = await fsSeeMoveFile(nodeData, dbModel);
 
     const dirPath = result.dirPath;
     const newDirPath = result.newDirPath;

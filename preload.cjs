@@ -4,14 +4,17 @@ contextBridge.exposeInMainWorld('api', {
     ipcSelectDir: (options) => ipcRenderer.invoke('ipcSelectDir', options),
     ipcScanDir: (dirPath) => ipcRenderer.invoke('ipcScanDir', dirPath),
 
+    ipcSeeRenameFile: (nodeData, dbModel) => ipcRenderer.invoke('ipcSeeRenameFile', nodeData, dbModel),
+    ipcDoRenameFile: (nodeData, dbModel) => ipcRenderer.invoke('ipcDoRenameFile', nodeData, dbModel),
+    ipcSeeMoveFile: (nodeData, dbModel) => ipcRenderer.invoke('ipcSeeMoveFile', nodeData, dbModel),
+    ipcDoMoveFile: (nodeData, dbModel) => ipcRenderer.invoke('ipcDoMoveFile', nodeData, dbModel),
+
     ipcGetResourceInfo: (dbModel) => ipcRenderer.invoke('ipcGetResourceInfo', dbModel),
     ipcGetResourceInfoV2: (dbModel) => ipcRenderer.invoke('ipcGetResourceInfoV2', dbModel),
-    ipcSaveResourceInfo: (dbMixModel) => ipcRenderer.invoke('ipcSaveResourceInfo', dbMixModel),
+    ipcSaveResourceInfo: (dbModel) => ipcRenderer.invoke('ipcSaveResourceInfo', dbModel),
 
-    ipcSeeRenameFile: (nodeData, dbMixModel) => ipcRenderer.invoke('ipcSeeRenameFile', nodeData, dbMixModel),
-    ipcDoRenameFile: (nodeData, dbMixModel) => ipcRenderer.invoke('ipcDoRenameFile', nodeData, dbMixModel),
-    ipcSeeMoveFile: (nodeData, dbMixModel) => ipcRenderer.invoke('ipcSeeMoveFile', nodeData, dbMixModel),
-    ipcDoMoveFile: (nodeData, dbMixModel) => ipcRenderer.invoke('ipcDoMoveFile', nodeData, dbMixModel),
+    ipcGetCreateByInfo: (dbModel) => ipcRenderer.invoke('ipcGetCreateByInfo', dbModel),
+    ipcSaveCreateByInfo: (dbModel) => ipcRenderer.invoke('ipcSaveCreateByInfo', dbModel),
 
     ipcGetAllTag: () => ipcRenderer.invoke('ipcGetAllTag'),
     ipcCreateTag: (dbModel) => ipcRenderer.invoke('ipcCreateTag', dbModel),

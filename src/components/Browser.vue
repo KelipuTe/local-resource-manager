@@ -39,8 +39,8 @@
                 <div class="form-container">
                     <div class="form-group">
                         <button @click="vueGetResourceInfo" class="btn-green btn-medium">查询（文件名）</button>
-                        <button @click="vueGetResourceInfoV2" class="btn-green btn-medium">查询（信息）</button>
-                        <button @click="vueSaveResourceInfo" class="btn-orange btn-medium">保存（信息）</button>
+                        <button @click="vueGetResourceInfoV2" class="btn-green btn-medium">查询（来源+资源的id）</button>
+                        <button @click="vueSaveResourceInfo" class="btn-orange btn-medium">保存</button>
                     </div>
                     <div class="form-group">
                         <button @click="vueSeeRenameFile" class="btn-green btn-medium">重命名（预览）</button>
@@ -48,26 +48,49 @@
                         <button @click="vueSeeMoveFile" class="btn-green btn-medium">归档（预览）</button>
                         <button @click="vueDoMoveFile" class="btn-orange btn-medium">归档（执行）</button>
                     </div>
+                    <div class="form-group">
+                        <button @click="vueAnalyzeBilibili" class="btn-green btn-medium">解析（B站资源）</button>
+                        <button @click="vueAnalyzePixiv" class="btn-green btn-medium">解析（Pixiv资源）</button>
+                    </div>
                 </div>
                 <div class="form-container">
                     <div v-for="(value, key) in resourceInfo" :key="key" class="form-group">
                         <label class="input-label">{{ fnGetResourceInfoKeyName(key) }}</label>
 
-                        <!-- filename 字段 -->
                         <div v-if="key === 'filename'">
                             <input :value="value" type="text" class="input-long"
                                 @input="fnChangeResourceInfoValue(key, $event.target.value)" />
                             <button @click="vueMakeFilename" class="btn-blue btn-medium">构造</button>
                         </div>
 
-                        <!-- resource_id 字段 -->
+                        <div v-else-if="key === 'source'">
+                            <input :value="value" type="text" class="input-medium"
+                                @input="fnChangeResourceInfoValue(key, $event.target.value)" />
+                            <select @change="fnChangeResourceInfoValue(key, $event.target.value)" class="input-short">
+                                <option value="">请选择</option>
+                                <option value="bilibili">bilibili</option>
+                                <option value="pixiv">pixiv</option>
+                                <option value="x">x(twitter)</option>
+                            </select>
+                        </div>
+
                         <div v-else-if="key === 'resource_id'">
                             <input :value="value" type="text" class="input-long"
                                 @input="fnChangeResourceInfoValue(key, $event.target.value)" />
                             <button @click="vueMakeResourseId" class="btn-blue btn-medium">构造</button>
                         </div>
 
-                        <!-- summary 字段 -->
+                        <div v-else-if="key === 'key_point'">
+                            <input :value="value" type="text" class="input-medium"
+                                @input="fnChangeResourceInfoValue(key, $event.target.value)" />
+                            <select @change="fnChangeResourceInfoValue(key, $event.target.value)" class="input-short">
+                                <option value="">请选择</option>
+                                <option value="画面">画面</option>
+                                <option value="声音">声音</option>
+                                <option value="文字">文字</option>
+                            </select>
+                        </div>
+
                         <div v-else-if="key === 'summary'">
                             <textarea :value="value" rows="10" class="input-long"
                                 @input="fnChangeResourceInfoValue(key, $event.target.value)"></textarea>
@@ -78,6 +101,27 @@
                             <input :value="value" type="text" class="input-long"
                                 @input="fnChangeResourceInfoValue(key, $event.target.value)" />
                         </div>
+                    </div>
+                </div>
+            </div>
+            <h3>
+                <span>资源所属用户的信息</span>
+                <button @click="createByInfoIsVisible = !createByInfoIsVisible" class="btn-blue btn-medium">
+                    {{ createByInfoIsVisible ? '收起' : '展开' }}
+                </button>
+            </h3>
+            <div v-if="createByInfoIsVisible">
+                <div class="form-container">
+                    <div class="form-group">
+                        <button @click="vueGetCreateByInfo" class="btn-green btn-medium">查询（来源+资源所属用户的id）</button>
+                        <button @click="vueSaveCreateByInfo" class="btn-orange btn-medium">保存</button>
+                    </div>
+                </div>
+                <div class="form-container">
+                    <div v-for="(value, key) in createByInfo" :key="key" class="form-group">
+                        <label class="input-label">{{ fnGetCreateByInfoKeyName(key) }}</label>
+                        <input :value="value" type="text" class="input-long"
+                            @input="fnChangeCreateByInfoValue(key, $event.target.value)" />
                     </div>
                 </div>
             </div>
@@ -107,7 +151,8 @@
                         <button @click="fnSearchTag" style="margin-left: 10px;" class="btn-blue btn-medium">搜索</button>
                     </div>
                     <div class="form-group">
-                        <span v-for="tag in displayTagList" :key="tag.id" class ="btn-medium" :class="fnIsResourseHaveTag(tag)?'btn-green' : 'btn-blue'">
+                        <span v-for="tag in displayTagList" :key="tag.id" class="btn-medium"
+                            :class="fnIsResourseHaveTag(tag) ? 'btn-green' : 'btn-blue'">
                             {{ tag.name }}
                             <button @click="fnAddTagToResource(tag)" class="btn-small"
                                 :disabled="fnIsResourseHaveTag(tag)">✅</button>
@@ -138,8 +183,10 @@ const vueShowError = inject('vueShowError')
 
 // ---------------- 文件树 ----------------
 
+// 根目录
 const rootDir = localStorage.getItem('rootDir');
 
+// 文件树根目录结点数据
 const rootNodeData = ref({
     dirPath: rootDir,
     name: '根目录',
@@ -150,8 +197,10 @@ const rootNodeData = ref({
     childrenIsLoad: false
 })
 
+// 根目录是否已扫描
 const rootDirIsScan = ref(false)
 
+// 扫描根目录
 const fnScanRootDir = async function () {
     const result = await window.api.ipcScanDir(rootDir)
 
@@ -163,21 +212,30 @@ const fnScanRootDir = async function () {
     resourceInfo.value = null;
 }
 
-fnScanRootDir();
-
 // 被选中的文件树结点
 const beSelectNode = ref(null)
 
-// 处理节点选中事件
+// 处理文件树结点被选中事件
 const fnTreeNodeBeSelect = async (nodeData) => {
     beSelectNode.value = nodeData
 
-    await vueGetResourceInfo();
+    if (!nodeData.isDir) {
+        resourceInfo.value = { ...resourceInfoDefault };
+        createByInfo.value = { ...createByInfoDefault };
 
-    if (resourceInfo.value != null) {
-        await fnGetAllTag();
-        if (resourceInfo.value.id != 0) {
-            await fnGetResourceTag();
+        await vueGetResourceInfo();
+
+        if (resourceInfo.value != null) {
+            if (resourceInfo.value.id != 0) {
+                createByInfo.value.source = resourceInfo.value.source;
+                createByInfo.value.user_id = resourceInfo.value.user_id;
+                await vueGetCreateByInfo();
+            }
+
+            await fnGetAllTag();
+            if (resourceInfo.value.id != 0) {
+                await fnGetResourceTag();
+            }
         }
     }
 }
@@ -218,7 +276,7 @@ const fnIsVideoFile = (nodeData) => {
 
 // ---------------- 资源的信息 ----------------
 
-// 控制【资源的信息】可不可见
+// 控制【资源的信息】这个区域可不可见
 const resourceInfoIsVisible = ref(true)
 
 const resourceInfoDefault = {
@@ -241,9 +299,10 @@ const resourceInfoDefault = {
     update_at: 'CURRENT_TIMESTAMP',
 }
 
+// 资源的数据
 const resourceInfo = ref(null)
 
-// 字段标签映射
+// 字段标签的映射
 const resourceInfoKeyNameMap = {
     id: 'ID',
     filename: '文件名',
@@ -252,8 +311,6 @@ const resourceInfoKeyNameMap = {
     resource_id: '资源的id',
     resource_index: '资源的下标',
     user_id: '资源所属用户的id',
-    username: '资源所属用户的名称',
-    user_ext_info: '资源所属用户的额外信息',
     resource_name: '资源的名称',
     ext_info: '资源的额外信息',
     publish_at: '资源的发布时间',
@@ -265,7 +322,7 @@ const resourceInfoKeyNameMap = {
     create_at: '创建时间',
     update_at: '修改时间'
 }
-// 获取字段标签
+// 获取字段标签的名称
 const fnGetResourceInfoKeyName = (key) => {
     if (resourceInfoKeyNameMap[key] != null) {
         return resourceInfoKeyNameMap[key];
@@ -280,64 +337,46 @@ const fnChangeResourceInfoValue = (key, value) => {
     }
 };
 
-const operateResult = ref(null)
-
-const vueOperateSuccess = (error) => {
-    operateResult.value = {
-        isSuccess: true,
-        message: '操作成功：' + error
-    };
-}
-
-const vueOperateFailed = (error) => {
-    operateResult.value = {
-        isSuccess: false,
-        message: '操作失败：' + error
-    };
-}
-
+// 获取资源的数据
 const vueGetResourceInfo = async () => {
-    const nodeData = beSelectNode.value
+    const nodeData = beSelectNode.value;
     if (!nodeData.isDir) {
         try {
-            const dbModel = { filename: nodeData.name }
-            const result = await window.api.ipcGetResourceInfo(dbModel)
-            resourceInfo.value = { ...resourceInfoDefault, ...result }
-        } catch (error) {
-            vueOperateFailed(error);
+            const dbModel = { filename: nodeData.name };
+            const result = await window.api.ipcGetResourceInfo(dbModel);
+            resourceInfo.value = { ...result };
+        } catch (err) {
+            vueShowError(err);
         }
     }
 };
 
+// 获取资源的数据
 const vueGetResourceInfoV2 = async () => {
-    const nodeData = beSelectNode.value
+    const nodeData = beSelectNode.value;
     if (!nodeData.isDir) {
         try {
             const dbModel = {
                 source: resourceInfo.value.source,
                 resource_id: resourceInfo.value.resource_id,
-                user_id: resourceInfo.value.user_id,
-            }
-            const result = await window.api.ipcGetResourceInfoV2(dbModel)
-            resourceInfo.value = { ...resourceInfoDefault, ...result }
-        } catch (error) {
-            vueOperateFailed(error);
+            };
+            const result = await window.api.ipcGetResourceInfoV2(dbModel);
+            resourceInfo.value = { ...resourceInfoDefault, ...result };
+        } catch (err) {
+            vueShowError(err);
         }
     }
 };
 
-// 保存资源的信息
+// 保存资源的数据
 const vueSaveResourceInfo = async () => {
     if (resourceInfo.value != null) {
         try {
             const argModel = { ...resourceInfo.value }
             const result = await window.api.ipcSaveResourceInfo(argModel);
-            operateResult.value = {
-                isSuccess: true,
-                message: '操作成功：' + JSON.stringify(result)
-            };
+            vueShowInfo('操作成功：<br>' + JSON.stringify(result));
         } catch (error) {
-            vueOperateFailed(error);
+            vueShowError(error);
         }
     }
 }
@@ -365,7 +404,7 @@ const vueMakeResourseId = () => {
 
 const vueSeeRenameFile = async () => {
     if (beSelectNode.value == null) {
-        vueOperateFailed('没有选中的文件树结点');
+        vueShowError(new Error('没有选中的文件树结点'));
         return;
     }
 
@@ -374,21 +413,16 @@ const vueSeeRenameFile = async () => {
         const argFileInfo = JSON.parse(JSON.stringify(resourceInfo.value))
         const result = await window.api.ipcSeeRenameFile(argBeSelectNode, argFileInfo);
         const needRenameFileList = result.needRenameFileList;
-        operateResult.value = {
-            isSuccess: true,
-            message: '需要重命名的文件：<br>' + needRenameFileList.join('<br>')
-        };
-    } catch (error) {
-        // console.error(thisFuncName, error);
-        vueOperateFailed(error);
+        let msg = '需要重命名的文件：<br>' + needRenameFileList.join('<br>');
+        vueShowInfo(msg);
+    } catch (err) {
+        vueShowError(err);
     }
 }
 
 const vueDoRenameFile = async () => {
-    // const thisFuncName = 'vueDoRenameFile';
-
     if (beSelectNode.value == null) {
-        vueOperateFailed('没有选中的文件树结点');
+        vueShowError(new Error('没有选中的文件树结点'));
         return;
     }
 
@@ -398,22 +432,19 @@ const vueDoRenameFile = async () => {
         const result = await window.api.ipcDoRenameFile(argBeSelectNode, argFileInfo);
         const dirPath = result.dirPath;
         const renameFileList = result.renameFileList;
-        let message = '目录【' + dirPath + '】<br>'
+        let msg = '目录【' + dirPath + '】<br>'
         for (const item of renameFileList) {
-            message += '文件【' + item.oldFilename + '】被重命名为【' + item.newFilename + '】<br>'
+            msg += '文件【' + item.oldFilename + '】被重命名为【' + item.newFilename + '】<br>'
         }
-        operateResult.value = {
-            isSuccess: true,
-            message: message
-        };
+        vueShowInfo('操作成功：<br>' + msg);
     } catch (error) {
-        vueOperateFailed(error);
+        vueShowError(error);
     }
 };
 
 const vueSeeMoveFile = async () => {
     if (beSelectNode.value == null) {
-        vueOperateFailed('没有选中的文件树结点或者资源信息不全');
+        vueShowError(new Error('没有选中的文件树结点、资源的信息不全'));
         return;
     }
 
@@ -424,18 +455,17 @@ const vueSeeMoveFile = async () => {
         const dirPath = result.dirPath;
         const newDirPath = result.newDirPath;
         const needMoveFileList = result.needMoveFileList;
-        operateResult.value = {
-            isSuccess: true,
-            message: '以下文件：<br>' + needMoveFileList.join('<br>') + '<br>将被从目录：' + dirPath + '<br>移动到目录：' + newDirPath
-        };
-    } catch (error) {
-        vueOperateFailed(error);
+        let msg = '以下文件：<br>' + needMoveFileList.join('<br>') +
+            '<br>将被从目录：' + dirPath + '<br>移动到目录：' + newDirPath
+        vueShowInfo(msg);
+    } catch (err) {
+        vueShowError(err);
     }
 }
 
 const vueDoMoveFile = async () => {
     if (!beSelectNode.value || !resourceInfo.value) {
-        vueOperateFailed('没有选中的文件树结点或者资源信息不全');
+        vueShowError(new Error('没有选中的文件树结点、资源的信息不全'));
         return;
     }
 
@@ -444,31 +474,145 @@ const vueDoMoveFile = async () => {
         const argFileInfo = JSON.parse(JSON.stringify(resourceInfo.value))
         const result = await window.api.ipcDoMoveFile(argBeSelectNode, argFileInfo);
         const moveFileList = result.moveFileList;
-        let message = ''
+        let msg = ''
         for (const item of moveFileList) {
-            message += '文件【' + item.filename + '】的全路径<br>--|从：' + item.oldFullPath + '<br>--|改成：' + item.newFullPath + '<br>'
+            msg += '文件【' + item.filename + '】的全路径<br>' +
+                '从【' + item.oldFullPath + '】<br>改成【' + item.newFullPath + '】<br>'
         }
-        operateResult.value = {
-            isSuccess: true,
-            message: message
-        };
-    } catch (error) {
-        vueOperateFailed(error);
+        vueShowInfo('操作成功：<br>' + msg);
+    } catch (err) {
+        vueShowError(err);
     }
+};
+
+const vueAnalyzeBilibili = async () => {
+    // {resource_id}_{user_id}_{发布日期}.{filetype}
+
+    const fullFilename = beSelectNode.value.name;
+
+    let parts = fullFilename.split('.');
+    if (parts.length !== 2) {
+        vueShowError(new Error('文件名格式不符合要求，{resource_id}_{user_id}_{发布日期}.{filetype}'));
+        return;
+    }
+    const filename = parts[0];
+    const filetype = parts[1];
+
+    parts = fullFilename.split('_');
+    if (parts.length !== 3) {
+        vueShowError(new Error('文件名格式不符合要求，{resource_id}_{user_id}_{发布日期}.{filetype}'));
+        return;
+    }
+    const resourceId = parts[0];
+    const userId = parts[1];
+
+    resourceInfo.value.filename = filename;
+    resourceInfo.value.filetype = filetype;
+    resourceInfo.value.source = 'bilibili';
+    resourceInfo.value.resource_id = resourceId;
+    resourceInfo.value.user_id = userId;
+
+    createByInfo.value.source = 'bilibili';
+    createByInfo.value.user_id = userId;
+};
+
+const vueAnalyzePixiv = async () => {
+
 };
 
 // -------------------------------- 资源的信息 --------------------------------
 
+// ---------------- 资源所属用户的信息 ----------------
+
+// 控制【资源所属用户的信息】这个区域可不可见
+const createByInfoIsVisible = ref(true)
+
+const createByInfoDefault = {
+    id: 0,
+    source: '0',
+    user_id: '0',
+    username: '0',
+    ext_info: '0',
+    same_as: '0',
+    create_at: 'CURRENT_TIMESTAMP',
+    update_at: 'CURRENT_TIMESTAMP',
+}
+
+const createByInfo = ref(null)
+
+// 字段标签映射
+const createByInfoKeyNameMap = {
+    id: 'ID',
+    source: '资源所属用户的来源',
+    user_id: '资源所属用户的id',
+    username: '资源所属用户的名称',
+    ext_info: '资源所属用户的额外信息',
+    same_as: '不同来源的同一个用户',
+    create_at: '创建时间',
+    update_at: '修改时间'
+}
+
+// 获取字段标签的名称
+const fnGetCreateByInfoKeyName = (key) => {
+    if (createByInfoKeyNameMap[key] != null) {
+        return createByInfoKeyNameMap[key];
+    }
+    return key;
+}
+
+// 相当于【v-model】，让数据源和输入框同步
+const fnChangeCreateByInfoValue = (key, value) => {
+    if (createByInfo.value != null) {
+        createByInfo.value[key] = value;
+    }
+};
+
+// 获取资源所属用户的数据
+const vueGetCreateByInfo = async () => {
+    const nodeData = beSelectNode.value
+    if (!nodeData.isDir) {
+        try {
+            const dbModel = {
+                source: createByInfo.value.source,
+                user_id: createByInfo.value.user_id,
+            }
+            const result = await window.api.ipcGetCreateByInfo(dbModel)
+            createByInfo.value = { ...result }
+        } catch (error) {
+            vueShowError(error);
+        }
+    }
+};
+
+// 保存资源所属用户的数据
+const vueSaveCreateByInfo = async () => {
+    if (createByInfo.value != null) {
+        try {
+            const dbModel = { ...createByInfo.value }
+            const result = await window.api.ipcSaveCreateByInfo(dbModel);
+            vueShowInfo('操作成功：<br>' + JSON.stringify(result));
+        } catch (err) {
+            vueShowError(err);
+        }
+    }
+}
+
+// -------------------------------- 资源所属用户的数据 --------------------------------
+
 // ---------------- 标签的信息 ----------------
 
+// 控制【标签的信息】这个区域可不可见
 const resourceTagIsVisible = ref(true);
 
 const allTagList = ref([]); // 所有的标签
-const resourceTagList = ref([]); // 资源的标签
+
+const newTagName = ref(''); // 新增标签的名称
+const newTagDescription = ref(''); // 新增标签的描述
+
+const resourceTagList = ref([]); // 资源拥有的标签
 const displayTagList = ref([]); // 显示的标签
+
 const tagSearchKey = ref(''); // 标签搜索关键词
-const newTagName = ref(''); // 标签名称
-const newTagDescription = ref(''); // 标签描述
 
 // 获取所有的标签
 const fnGetAllTag = async () => {
@@ -480,19 +624,6 @@ const fnGetAllTag = async () => {
         vueShowError(err)
     }
 };
-
-// 获取资源的标签
-const fnGetResourceTag = async () => {
-    try {
-        const resourceId = resourceInfo.value.id
-        const result = await window.api.ipcGetResourceTag(resourceId);
-        resourceTagList.value = result;
-    } catch (err) {
-       vueShowError(err);
-    }
-};
-
-
 
 // 创建新标签
 const fnCreateNewTag = async () => {
@@ -520,6 +651,16 @@ const fnCreateNewTag = async () => {
     }
 };
 
+// 获取资源的标签
+const fnGetResourceTag = async () => {
+    try {
+        const resourceId = resourceInfo.value.id
+        const result = await window.api.ipcGetResourceTag(resourceId);
+        resourceTagList.value = result;
+    } catch (err) {
+        vueShowError(err);
+    }
+};
 
 // 给资源添加标签
 const fnAddTagToResource = (tag) => {
@@ -538,7 +679,7 @@ const fnDelTagFromResource = (tag) => {
     }
 };
 
-// 保存资源标签
+// 保存资源的标签
 const fnSaveResourceTag = async () => {
     try {
         const resourceId = resourceInfo.value.id;
@@ -572,6 +713,10 @@ const fnSearchTag = () => {
 };
 
 // -------------------------------- 标签的信息 --------------------------------
+
+// 页面加载的时候，初始化
+fnScanRootDir();
+
 </script>
 
 <style scoped>

@@ -20,7 +20,7 @@
     <div v-if="globalMsg.show" class="message-popup" :class="'message-popup-' + globalMsg.type">
       <div class="message-popup-content">
         <span class="message-popup-close-btn" @click="fnCloseMessagePopup">&times;</span>
-        <p class="message-popup-text">{{ globalMsg.content }}</p>
+        <p class="message-popup-text" v-html="globalMsg.content"></p>
       </div>
     </div>
   </div>
@@ -70,7 +70,7 @@ const globalMsg = ref({
 
 // 提供全局显示普通信息的方法
 provide('vueShowInfo', (msg) => {
-  console.log(msg);
+  console.info(msg);
   globalMsg.value = {
     show: true,
     type: 'info',
