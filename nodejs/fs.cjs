@@ -1,6 +1,8 @@
 const { dialog } = require('electron/main');
 const fs = require('fs/promises');
 const path = require('path');
+const xml2js = require('xml2js');
+
 const { config } = require('../util/config.cjs');
 const { config: dbConfig } = require('../database/config.cjs');
 
@@ -223,6 +225,30 @@ async function fsDoMoveFile(nodeData, dbModel) {
     return returnData;
 }
 
+/**
+ * 从 Bilibili 视频的元数据中获取视频的信息
+ * @param nodeData 被选中的结点
+ */
+async function fsAnalyzeBilibili(nodeData) {
+    const dirPath = nodeData.dirPath;
+    const name = nodeData.name;
+
+    const baseName = path.parse(name).name;
+    const nfoFilePath = path.join(dirPath, `${baseName}.nfo`);
+
+    const xmlData = await fs.readFile(nfoFilePath, 'utf-8');
+
+    const returnData = {};
+    xml2js.parseString(xmlData, (err, result) => {
+        if (err != null) {
+            throw new Error(`解析 XML 失败：${err}`);
+        }
+        returnData.parsedXml = result;
+    });
+
+    return returnData;
+}
+
 module.exports = {
     fsSetMainWindow,
     fsSelectDir,
@@ -231,4 +257,5 @@ module.exports = {
     fsDoRenameFile,
     fsSeeMoveFile,
     fsDoMoveFile,
+    fsAnalyzeBilibili,
 };

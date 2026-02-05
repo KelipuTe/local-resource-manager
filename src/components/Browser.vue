@@ -432,11 +432,11 @@ const vueDoRenameFile = async () => {
         const result = await window.api.ipcDoRenameFile(argBeSelectNode, argFileInfo);
         const dirPath = result.dirPath;
         const renameFileList = result.renameFileList;
-        let msg = '目录【' + dirPath + '】<br>'
+        let msg = `目录【${dirPath}】<br>`
         for (const item of renameFileList) {
-            msg += '文件【' + item.oldFilename + '】被重命名为【' + item.newFilename + '】<br>'
+            msg += `文件【${item.oldFilename}】<br>被重命名为【${item.newFilename}】<br>`
         }
-        vueShowInfo('操作成功：<br>' + msg);
+        vueShowInfo(`操作成功：<br>${msg}`);
     } catch (error) {
         vueShowError(error);
     }
@@ -455,8 +455,8 @@ const vueSeeMoveFile = async () => {
         const dirPath = result.dirPath;
         const newDirPath = result.newDirPath;
         const needMoveFileList = result.needMoveFileList;
-        let msg = '以下文件：<br>' + needMoveFileList.join('<br>') +
-            '<br>将被从目录：' + dirPath + '<br>移动到目录：' + newDirPath
+        let msg = '以下文件：<br>' + needMoveFileList.join('<br>') + '<br>' +
+            `将被从目录【${dirPath}】<br>移动到目录【${newDirPath}】`
         vueShowInfo(msg);
     } catch (err) {
         vueShowError(err);
@@ -476,44 +476,49 @@ const vueDoMoveFile = async () => {
         const moveFileList = result.moveFileList;
         let msg = ''
         for (const item of moveFileList) {
-            msg += '文件【' + item.filename + '】的全路径<br>' +
-                '从【' + item.oldFullPath + '】<br>改成【' + item.newFullPath + '】<br>'
+            msg += `文件【${item.filename}】的全路径<br>` +
+                `从【${item.oldFullPath}】<br>改成【${item.newFullPath}】<br>`
         }
-        vueShowInfo('操作成功：<br>' + msg);
+        vueShowInfo(`操作成功：<br>${msg}`);
     } catch (err) {
         vueShowError(err);
     }
 };
 
 const vueAnalyzeBilibili = async () => {
-    // {resource_id}_{user_id}_{发布日期}.{filetype}
+    if (!beSelectNode.value) {
+        vueShowError(new Error('没有选中的文件树结点'));
+        return;
+    }
 
     const fullFilename = beSelectNode.value.name;
 
     let parts = fullFilename.split('.');
     if (parts.length !== 2) {
-        vueShowError(new Error('文件名格式不符合要求，{resource_id}_{user_id}_{发布日期}.{filetype}'));
+        vueShowError(new Error('文件名格式不符合要求，{xxxx}.{filetype}'));
         return;
     }
     const filename = parts[0];
     const filetype = parts[1];
 
-    parts = fullFilename.split('_');
-    if (parts.length !== 3) {
-        vueShowError(new Error('文件名格式不符合要求，{resource_id}_{user_id}_{发布日期}.{filetype}'));
-        return;
+    try {
+        const argBeSelectNode = JSON.parse(JSON.stringify(beSelectNode.value))
+        const result = await window.api.ipcAnalyzeBilibili(argBeSelectNode);
+
+        resourceInfo.value.filename = filename;
+        resourceInfo.value.filetype = filetype;
+        resourceInfo.value.source = 'bilibili';
+        resourceInfo.value.resource_id = result.parsedXml.movie.uniqueid[0]._;
+        resourceInfo.value.user_id = result.parsedXml.movie.actor[0].role[0];
+        resourceInfo.value.resource_name = result.parsedXml.movie.title[0];
+        resourceInfo.value.publish_at = result.parsedXml.movie.premiered[0] + ' 12:00:00';
+
+        createByInfo.value.source = 'bilibili';
+        createByInfo.value.user_id = result.parsedXml.movie.actor[0].role[0];
+        createByInfo.value.username = result.parsedXml.movie.actor[0].name[0];
+    } catch (err) {
+        vueShowError(err);
     }
-    const resourceId = parts[0];
-    const userId = parts[1];
-
-    resourceInfo.value.filename = filename;
-    resourceInfo.value.filetype = filetype;
-    resourceInfo.value.source = 'bilibili';
-    resourceInfo.value.resource_id = resourceId;
-    resourceInfo.value.user_id = userId;
-
-    createByInfo.value.source = 'bilibili';
-    createByInfo.value.user_id = userId;
 };
 
 const vueAnalyzePixiv = async () => {

@@ -9,6 +9,7 @@ const {
     fsDoRenameFile,
     fsSeeMoveFile,
     fsDoMoveFile,
+    fsAnalyzeBilibili,
 } = require('./nodejs/fs.cjs');
 
 async function ipcSelectDir(_, options) {
@@ -33,6 +34,10 @@ async function ipcSeeMoveFile(_, nodeData, dbModel) {
 
 async function ipcDoMoveFile(_, nodeData, dbModel) {
     return await fsDoMoveFile(nodeData, dbModel);
+}
+
+async function ipcAnalyzeBilibili(_, nodeData) {
+    return await fsAnalyzeBilibili(nodeData);
 }
 
 const {
@@ -103,6 +108,8 @@ function ipcRegisterHandler() {
     ipcMain.handle('ipcDoRenameFile', ipcDoRenameFile);
     ipcMain.handle('ipcSeeMoveFile', ipcSeeMoveFile);
     ipcMain.handle('ipcDoMoveFile', ipcDoMoveFile);
+
+    ipcMain.handle('ipcAnalyzeBilibili', ipcAnalyzeBilibili);
 
     ipcMain.handle('ipcGetResourceInfo', ipcGetResourceInfo);
     ipcMain.handle('ipcGetResourceInfoV2', ipcGetResourceInfoV2);

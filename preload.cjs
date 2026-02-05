@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('api', {
     ipcSeeMoveFile: (nodeData, dbModel) => ipcRenderer.invoke('ipcSeeMoveFile', nodeData, dbModel),
     ipcDoMoveFile: (nodeData, dbModel) => ipcRenderer.invoke('ipcDoMoveFile', nodeData, dbModel),
 
+    ipcAnalyzeBilibili: (nodeData) => ipcRenderer.invoke('ipcAnalyzeBilibili', nodeData),
+
     ipcGetResourceInfo: (dbModel) => ipcRenderer.invoke('ipcGetResourceInfo', dbModel),
     ipcGetResourceInfoV2: (dbModel) => ipcRenderer.invoke('ipcGetResourceInfoV2', dbModel),
     ipcSaveResourceInfo: (dbModel) => ipcRenderer.invoke('ipcSaveResourceInfo', dbModel),

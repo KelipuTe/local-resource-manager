@@ -22,7 +22,7 @@ const dbCreateByModelDefault = {
 };
 
 /**
- * 查询资源所属用户的数据（通过：来源、id）
+ * 查询资源所属用户的数据（通过：来源、用户id）
  * @param dbModel dbCreateByModelDefault
  * @returns
  * reject(Object) dbCreateByModelDefault
@@ -114,7 +114,7 @@ WHERE id = ?;`;
 }
 
 /**
- * 查询资源所属用户数据（通过：来源、id）
+ * 查询资源所属用户数据（通过：来源、用户id）
  * @param dbModel dbCreateByModelDefault
  * @returns
  * reject(Object) dbCreateByModelDefault
