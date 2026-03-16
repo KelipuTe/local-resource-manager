@@ -28,7 +28,10 @@
 </template>
 
 <script setup>
+// vue3 的模块
 import { ref, computed, provide } from 'vue'
+
+// 我写的模块
 import Config from './components/Config.vue'
 import Browser from './components/Browser.vue'
 import Search from './components/Search.vue'
@@ -36,8 +39,8 @@ import Search from './components/Search.vue'
 // 导航列表
 const navList = ref([
   { key: 'config', name: '基本设置' },
-  { key: 'browser', name: '浏览仓库' },
-  { key: 'search', name: '资源搜索' }
+  { key: 'browser', name: '仓库浏览' },
+  { key: 'search', name: '资源检索' }
 ])
 
 // 组件映射
@@ -60,8 +63,9 @@ const vueActiveComponent = computed(() => {
   return componentMap[activeNav.value]
 })
 
-// 全局提示信息
-// type=info|error
+// ---------------- 全局提示信息 ----------------
+
+// type。info；error。
 const globalMsg = ref({
   show: false,
   type: 'error',
@@ -69,7 +73,7 @@ const globalMsg = ref({
 })
 
 // 提供全局显示普通信息的方法
-provide('vueShowInfo', (msg) => {
+provide('gfnShowInfo', (msg) => {
   console.info(msg);
   globalMsg.value = {
     show: true,
@@ -79,7 +83,7 @@ provide('vueShowInfo', (msg) => {
 })
 
 // 提供全局显示错误信息的方法
-provide('vueShowError', (err) => {
+provide('gfnShowError', (err) => {
   console.error(err);
   globalMsg.value = {
     show: true,
@@ -87,6 +91,8 @@ provide('vueShowError', (err) => {
     content: err.message
   };
 })
+
+// -------------------------------- 全局提示信息 --------------------------------
 
 const fnCloseMessagePopup = () => {
   globalMsg.value = {

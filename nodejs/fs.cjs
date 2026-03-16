@@ -1,15 +1,20 @@
-const { dialog } = require('electron/main');
 const fs = require('fs/promises');
 const path = require('path');
+const child_process = require('child_process');
+
+const { dialog } = require('electron/main');
+
 const xml2js = require('xml2js');
 
-const { config } = require('../util/config.cjs');
-const { config: dbConfig } = require('../database/config.cjs');
+const dbConfig = require('../database/config.cjs');
+
+const utilConfig = require('../util/config.cjs');
+const utilLog = require('../util/log.cjs');
 
 let mainWindow;
 
 /**
- * 【依赖注入】设置主窗口的引用
+ * 【依赖注入】。设置主窗口的引用。
  */
 function fsSetMainWindow(window) {
     mainWindow = window;
@@ -103,7 +108,7 @@ async function fsSeeRenameFile(nodeData, dbModel) {
  * 重命名文件（执行）
  * @param nodeData 被选中的结点
  * @param dbModel dbResourceModelDefault
- * 重命名规则。资源id_资源index_重命名时间
+ * 重命名规则。{资源 id}_{资源 index}_重命名时间
  */
 async function fsDoRenameFile(nodeData, dbModel) {
     const dirPath = nodeData.dirPath;
@@ -143,20 +148,20 @@ async function fsDoRenameFile(nodeData, dbModel) {
  * 归档文件（预览）
  * @param nodeData 被选中的结点
  * @param dbModel dbResourceModelDefault
- * 归档目录规则。根目录\分类目录\资源的发布时间\资源的来源\资源所属用户的id\资源的id\
+ * 归档目录规则。根目录\分类目录\资源的发布时间\资源的来源\{资源所属用户的 id}\{资源的 id}\
  */
 async function fsSeeMoveFile(nodeData, dbModel) {
     const dirPath = nodeData.dirPath
     const baseName = dbModel.filename
     const source = dbModel.source;
-    const userId = dbModel.user_id;
-    const resourceId = dbModel.resource_id;
-    const publishAt = dbModel.publish_at;
-    const keyPoint = dbModel.key_point;
+    const userId = dbModel.userId;
+    const resourceId = dbModel.resourceId;
+    const publishAt = dbModel.publishAt;
+    const keyPoint = dbModel.keyPoint;
 
     // 分类目录
-    if (keyPoint == null || keyPoint == dbConfig.dbTextDefaultValue) {
-        throw new Error('缺少【key_point】字段');
+    if (keyPoint == null || keyPoint == dbConfig.textValueDefault) {
+        throw new Error('缺少 key_point 字段');
     }
 
     // 扫描需要归档的文件
@@ -169,13 +174,13 @@ async function fsSeeMoveFile(nodeData, dbModel) {
 
     // 资源的发布时间
     let year = '0000';
-    if (publishAt != null && publishAt != dbConfig.dbTextDefaultValue) {
+    if (publishAt != null && publishAt != dbConfig.textValueDefault) {
         year = new Date(publishAt).getFullYear().toString();
     } else {
         year = '0_' + resourceId.substring(0, 4);
     }
 
-    const newDirPath = path.join(config.rootPath, keyPoint, year, source, userId, resourceId);
+    const newDirPath = path.join(utilConfig.rootPath, keyPoint, year, source, userId, resourceId);
 
     const returnData = {
         dirPath: dirPath,
@@ -190,7 +195,7 @@ async function fsSeeMoveFile(nodeData, dbModel) {
  * 归档文件（执行）
  * @param nodeData 被选中的结点
  * @param dbModel dbResourceModelDefault
- * 归档目录规则。根目录\分类目录\资源的发布时间\资源的来源\资源所属用户的id\资源的id\
+ * 归档目录规则。根目录\分类目录\资源的发布时间\资源的来源\{资源所属用户的 id}\{资源的 id}\
  */
 async function fsDoMoveFile(nodeData, dbModel) {
     const result = await fsSeeMoveFile(nodeData, dbModel);
@@ -199,7 +204,7 @@ async function fsDoMoveFile(nodeData, dbModel) {
     const newDirPath = result.newDirPath;
     const needMoveFileList = result.needMoveFileList;
 
-    // 创建目录。【recursive: true】表示递归创建。
+    // 创建目录。recursive: true。表示，递归创建。
     await fs.mkdir(newDirPath, { recursive: true });
 
     const moveFileList = [];
@@ -241,12 +246,37 @@ async function fsAnalyzeBilibili(nodeData) {
     const returnData = {};
     xml2js.parseString(xmlData, (err, result) => {
         if (err != null) {
-            throw new Error(`解析 XML 失败：${err}`);
+            throw new Error(`【失败】。解析 XML 失败。报错：【${err}】。`);
         }
         returnData.parsedXml = result;
     });
 
     return returnData;
+}
+
+/**
+ * 打开被选中的结点对应的本地文件夹
+ * @param nodeData 被选中的结点
+ */
+async function fsOpenLocalFolder(nodeData) {
+    const dirPath = nodeData.dirPath;
+
+    // 不同的操作系统，执行命令的方式不同
+    let command;
+    switch (process.platform) {
+        case 'win32':
+            command = `explorer "${dirPath}"`;
+            break;
+        default:
+            throw new Error('调用操作系统失败');
+    }
+
+    // child_process.exec() 是异步调用
+    child_process.exec(command, (err) => {
+        if (err != null) {
+            utilLog.fnLogErrLog(err);
+        }
+    });
 }
 
 module.exports = {
@@ -258,4 +288,5 @@ module.exports = {
     fsSeeMoveFile,
     fsDoMoveFile,
     fsAnalyzeBilibili,
+    fsOpenLocalFolder,
 };

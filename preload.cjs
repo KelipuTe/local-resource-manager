@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('api', {
 
     ipcAnalyzeBilibili: (nodeData) => ipcRenderer.invoke('ipcAnalyzeBilibili', nodeData),
 
+    ipcOpenLocalFolder:(nodeData) => ipcRenderer.invoke('ipcOpenLocalFolder', nodeData),
+
     ipcGetResourceInfo: (dbModel) => ipcRenderer.invoke('ipcGetResourceInfo', dbModel),
     ipcGetResourceInfoV2: (dbModel) => ipcRenderer.invoke('ipcGetResourceInfoV2', dbModel),
     ipcSaveResourceInfo: (dbModel) => ipcRenderer.invoke('ipcSaveResourceInfo', dbModel),
@@ -22,4 +24,6 @@ contextBridge.exposeInMainWorld('api', {
     ipcCreateTag: (dbModel) => ipcRenderer.invoke('ipcCreateTag', dbModel),
     ipcGetResourceTag: (resourceId) => ipcRenderer.invoke('ipcGetResourceTag', resourceId),
     ipcSaveResourceTag: (resourceId, tagIds) => ipcRenderer.invoke('ipcSaveResourceTag', resourceId, tagIds),
+
+    ipcFuzzyQueryResourceByFilename: (queryArg) => ipcRenderer.invoke('ipcFuzzyQueryResourceByFilename', queryArg),
 })

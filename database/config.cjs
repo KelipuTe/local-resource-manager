@@ -1,8 +1,7 @@
-const config = {
-    dbTextDefaultValue: '0',
-    dbTextDefaultValueNowTime: 'CURRENT_TIMESTAMP',
-}
+const textValueDefault = '0';
+const textValueNowTime = 'CURRENT_TIMESTAMP';
 
 module.exports = {
-    config: config,
+    textValueDefault,
+    textValueNowTime,
 }

@@ -1,127 +1,84 @@
 const { ipcMain } = require('electron/main');
 
-const { inputProcess } = require('./util/validate.cjs');
+const dbResource = require('./database/resource.cjs');
+const dbCreateBy = require('./database/create_by.cjs');
+const dbTag = require('./database/tag.cjs');
 
-const {
-    fsSelectDir,
-    fsScanDir,
-    fsSeeRenameFile,
-    fsDoRenameFile,
-    fsSeeMoveFile,
-    fsDoMoveFile,
-    fsAnalyzeBilibili,
-} = require('./nodejs/fs.cjs');
+const nodejsFs = require('./nodejs/fs.cjs');
 
-async function ipcSelectDir(_, options) {
-    return await fsSelectDir(options);
-}
-
-async function ipcScanDir(_, dirPath) {
-    return await fsScanDir(dirPath);
-}
-
-async function ipcSeeRenameFile(_, nodeData, dbModel) {
-    return await fsSeeRenameFile(nodeData, dbModel);
-}
-
-async function ipcDoRenameFile(_, nodeData, dbModel) {
-    return await fsDoRenameFile(nodeData, dbModel);
-}
-
-async function ipcSeeMoveFile(_, nodeData, dbModel) {
-    return await fsSeeMoveFile(nodeData, dbModel);
-}
-
-async function ipcDoMoveFile(_, nodeData, dbModel) {
-    return await fsDoMoveFile(nodeData, dbModel);
-}
-
-async function ipcAnalyzeBilibili(_, nodeData) {
-    return await fsAnalyzeBilibili(nodeData);
-}
-
-const {
-    dbResourceQuery,
-    dbResourceQueryV2,
-    dbResourceSave
-} = require('./database/resource.cjs');
-
-async function ipcGetResourceInfo(_, dbModel) {
-    return await dbResourceQuery(dbModel);
-}
-
-async function ipcGetResourceInfoV2(_, dbModel) {
-    return await dbResourceQueryV2(dbModel);
-}
-
-async function ipcSaveResourceInfo(_, dbModel) {
-    dbModel = inputProcess(dbModel)
-    return await dbResourceSave(dbModel);
-}
-
-const {
-    dbCreateByQuery,
-    dbCreateBySave
-} = require('./database/create_by.cjs');
-
-async function ipcGetCreateByInfo(_, dbModel) {
-    return await dbCreateByQuery(dbModel);
-}
-
-async function ipcSaveCreateByInfo(_, dbModel) {
-    dbModel = inputProcess(dbModel)
-    return await dbCreateBySave(dbModel);
-}
-
-const {
-    dbTagQueryAll,
-    dbTagCreate,
-    dbResourceTagQuery,
-    dbResourceTagSave
-} = require('./database/tag.cjs');
-
-async function ipcGetAllTag() {
-    return await dbTagQueryAll();
-}
-
-async function ipcCreateTag(_, dbModel) {
-    dbModel = inputProcess(dbModel)
-    return await dbTagCreate(dbModel);
-}
-
-async function ipcGetResourceTag(_, resourceId) {
-    return await dbResourceTagQuery(resourceId);
-}
-
-async function ipcSaveResourceTag(_, resourceId, tagIdList) {
-    return await dbResourceTagSave(resourceId, tagIdList);
-}
+const validate = require('./util/validate.cjs');
 
 /**
- * 【IPC】注册处理函数
+ * 注册 IPC 对应的处理函数
  */
 function ipcRegisterHandler() {
-    ipcMain.handle('ipcSelectDir', ipcSelectDir);
-    ipcMain.handle('ipcScanDir', ipcScanDir);
+    // nodejsFs
+    ipcMain.handle('ipcSelectDir', async function (_, options) {
+        return await nodejsFs.fsSelectDir(options);
+    });
+    ipcMain.handle('ipcScanDir', async function (_, dirPath) {
+        return await nodejsFs.fsScanDir(dirPath);
+    });
 
-    ipcMain.handle('ipcSeeRenameFile', ipcSeeRenameFile);
-    ipcMain.handle('ipcDoRenameFile', ipcDoRenameFile);
-    ipcMain.handle('ipcSeeMoveFile', ipcSeeMoveFile);
-    ipcMain.handle('ipcDoMoveFile', ipcDoMoveFile);
+    ipcMain.handle('ipcSeeRenameFile', async function (_, nodeData, dbModel) {
+        return await nodejsFs.fsSeeRenameFile(nodeData, dbModel);
+    });
+    ipcMain.handle('ipcDoRenameFile', async function (_, nodeData, dbModel) {
+        return await nodejsFs.fsDoRenameFile(nodeData, dbModel);
+    });
+    ipcMain.handle('ipcSeeMoveFile', async function (_, nodeData, dbModel) {
+        return await nodejsFs.fsSeeMoveFile(nodeData, dbModel);
+    });
+    ipcMain.handle('ipcDoMoveFile', async function (_, nodeData, dbModel) {
+        return await nodejsFs.fsDoMoveFile(nodeData, dbModel);
+    });
 
-    ipcMain.handle('ipcAnalyzeBilibili', ipcAnalyzeBilibili);
+    ipcMain.handle('ipcAnalyzeBilibili', async function (_, nodeData) {
+        return await nodejsFs.fsAnalyzeBilibili(nodeData);
+    });
 
-    ipcMain.handle('ipcGetResourceInfo', ipcGetResourceInfo);
-    ipcMain.handle('ipcGetResourceInfoV2', ipcGetResourceInfoV2);
-    ipcMain.handle('ipcSaveResourceInfo', ipcSaveResourceInfo);
+    ipcMain.handle('ipcOpenLocalFolder', async function (_, nodeData) {
+        return await nodejsFs.fsOpenLocalFolder(nodeData);
+    });
 
-    ipcMain.handle('ipcGetCreateByInfo', ipcGetCreateByInfo);
-    ipcMain.handle('ipcSaveCreateByInfo', ipcSaveCreateByInfo);
+    // dbResource
+    ipcMain.handle('ipcGetResourceInfo', async function (_, dbModel) {
+        return await dbResource.fnQueryByFilename(dbModel);
+    });
+    ipcMain.handle('ipcGetResourceInfoV2', async function (_, dbModel) {
+        return await dbResource.fnQueryBySourceAndId(dbModel);
+    });
+    ipcMain.handle('ipcSaveResourceInfo', async function (_, dbModel) {
+        dbModel = validate.inputProcess(dbModel)
+        return await dbResource.fnSaveModel(dbModel);
+    });
+    ipcMain.handle('ipcFuzzyQueryResourceByFilename', async function (_, queryArgObj) {
+        return await dbResource.fnFuzzyQueryByFilename(queryArgObj);
+    });
 
-    ipcMain.handle('ipcGetAllTag', ipcGetAllTag);
-    ipcMain.handle('ipcCreateTag', ipcCreateTag);
-    ipcMain.handle('ipcGetResourceTag', ipcGetResourceTag);
-    ipcMain.handle('ipcSaveResourceTag', ipcSaveResourceTag);
+    // dbCreateBy
+    ipcMain.handle('ipcGetCreateByInfo', async function (_, dbModel) {
+        return await dbCreateBy.dbCreateByQuery(dbModel);
+    });
+    ipcMain.handle('ipcSaveCreateByInfo', async function (_, dbModel) {
+        dbModel = validate.inputProcess(dbModel)
+        return await dbCreateBy.dbCreateBySave(dbModel);
+    });
+
+    // dbTag
+    ipcMain.handle('ipcGetAllTag', async function () {
+        return await dbTag.dbTagQueryAll();
+    });
+    ipcMain.handle('ipcCreateTag', async function (_, dbModel) {
+        dbModel = validate.inputProcess(dbModel)
+        return await dbTag.dbTagCreate(dbModel);
+    });
+    ipcMain.handle('ipcGetResourceTag', async function (_, resourceId) {
+        return await dbTag.dbResourceTagQuery(resourceId);
+    });
+    ipcMain.handle('ipcSaveResourceTag', async function (_, resourceId, tagIdList) {
+        return await dbTag.dbResourceTagSave(resourceId, tagIdList);
+    });
 }
 
 module.exports = {

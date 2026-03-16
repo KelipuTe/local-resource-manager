@@ -1,7 +1,7 @@
-const { getNowDateTime } = require('../util/time.cjs');
-
-const { config } = require('./config.cjs');
-const { logSqlLog } = require('../util/log.cjs');
+const dbConfig = require('./config.cjs');
+const utilLog = require('../util/log.cjs');
+const utilTime = require('../util/time.cjs');
+const utilType = require('../util/type.cjs');
 
 let dbConn;
 
@@ -12,13 +12,13 @@ function dbSetDbConn(conn) {
 // 【create_by 表】的模型
 const dbCreateByModelDefault = {
     id: 0,
-    source: config.dbTextDefaultValue,
-    user_id: config.dbTextDefaultValue,
-    username: config.dbTextDefaultValue,
-    ext_info: config.dbTextDefaultValue,
-    same_as: config.dbTextDefaultValue,
-    create_at: config.dbTextDefaultValueNowTime,
-    update_at: config.dbTextDefaultValueNowTime,
+    source: dbConfig.textValueDefault,
+    userId: dbConfig.textValueDefault,
+    username: dbConfig.textValueDefault,
+    extInfo: dbConfig.textValueDefault,
+    sameAs: dbConfig.textValueDefault,
+    createAt: dbConfig.textValueNowTime,
+    updateAt: dbConfig.textValueNowTime,
 };
 
 /**
@@ -29,19 +29,17 @@ const dbCreateByModelDefault = {
  * resolve(string) 报错信息
  */
 function dbCreateBySelect(dbModel) {
-    const thisFuncName = 'dbCreateBySelect';
-
     return new Promise((resolve, reject) => {
         const sql = `SELECT * FROM \`create_by\` WHERE  user_id = ? AND source = ?;`;
 
-        const { user_id, source } = dbModel;
-        const valueList = [user_id, source];
+        const { userId, source } = dbModel;
+        const valueList = [userId, source];
 
-        logSqlLog(thisFuncName, sql, valueList)
+        utilLog.fnLogSqlLog(sql, valueList)
 
         dbConn.get(sql, valueList, (err, row) => {
             if (err != null) {
-                console.error(thisFuncName, err.message);
+                utilLog.fnLogErrLog(err);
                 reject(err.message);
                 return;
             } else {
@@ -59,21 +57,20 @@ function dbCreateBySelect(dbModel) {
  * resolve(string) 报错信息
  */
 function dbCreateByInsert(dbModel) {
-    const thisFuncName = 'dbCreateByInsert';
-
     return new Promise((resolve, reject) => {
         const sql = `INSERT INTO 
 \`create_by\` (source, user_id, username, create_at, update_at) 
 VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`;
 
-        const { source, user_id, username } = dbModel;
-        const valueList = [source, user_id, username];
+        const { source, userId, username } = dbModel;
+        const valueList = [source, userId, username];
 
-        logSqlLog(thisFuncName, sql, valueList)
+        utilLog.fnLogSqlLog(sql, valueList)
 
-        dbConn.run(sql, valueList, function(err)  {
+        // 需要用 this 获取插入后的 id，箭头函数没有 this
+        dbConn.run(sql, valueList, function (err) {
             if (err != null) {
-                console.error(thisFuncName, err.message);
+                utilLog.fnLogErrLog(err);
                 reject(err.message);
                 return;
             }
@@ -90,21 +87,19 @@ VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`;
  * resolve(string) 报错信息
  */
 function dbCreateByUpdate(dbModel) {
-    const thisFuncName = 'dbCreateByUpdate';
-
     return new Promise((resolve, reject) => {
         const sql = `UPDATE \`create_by\` 
 SET username = ?, ext_info = ?, update_at = CURRENT_TIMESTAMP 
 WHERE id = ?;`;
 
-        const { username, ext_info, id } = dbModel;
-        const valueList = [username, ext_info, id];
+        const { username, extInfo, id } = dbModel;
+        const valueList = [username, extInfo, id];
 
-        logSqlLog(thisFuncName, sql, valueList)
+        utilLog.fnLogSqlLog(sql, valueList)
 
         dbConn.run(sql, valueList, (err) => {
             if (err != null) {
-                console.error(thisFuncName, err.message);
+                utilLog.fnLogErrLog(err);
                 reject(err.message);
                 return;
             }
@@ -124,6 +119,7 @@ async function dbCreateByQuery(dbModel) {
     let returnData = { ...dbCreateByModelDefault };
     result = await dbCreateBySelect(dbModel);
     if (result != null) {
+        result = utilType.fnObjKeySnakeToCamel(result);
         returnData = { ...returnData, ...result };
     }
     return returnData;
@@ -139,11 +135,12 @@ async function dbCreateByQuery(dbModel) {
 async function dbCreateBySave(dbModel) {
     const result = await dbCreateBySelect(dbModel);
     if (result != null) {
-        dbModel.ext_info = result.ext_info;
+        dbModel.id = result.id;
+        dbModel.extInfo = result.extInfo;
         if (dbModel.username != result.username) {
-            const nowDateTime = getNowDateTime();
+            const nowDateTime = utilTime.fnGetNowDateTime();
             const addExtInfo = `${nowDateTime}，从【${result.username}】修改为【${dbModel.username}】；`;
-            dbModel.ext_info = dbModel.ext_info + addExtInfo;
+            dbModel.extInfo = dbModel.extInfo + addExtInfo;
         }
         return await dbCreateByUpdate(dbModel);
     } else {

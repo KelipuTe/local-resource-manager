@@ -1,4 +1,4 @@
-function getNowDateTime() {
+function fnGetNowDateTime() {
     const now = new Date();
 
     // 【getMonth()】拿到的月份是【0-11】
@@ -13,5 +13,5 @@ function getNowDateTime() {
 }
 
 module.exports = {
-    getNowDateTime
+    fnGetNowDateTime
 };

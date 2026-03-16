@@ -1,8 +1,8 @@
 /**
- * 获取当前时间（yyyy-mm-dd hh:mm:ss）
+ * 获取当前时间（可读模式，yyyy-MM-dd HH:mm:ss）
  * (new Date()).getMonth() 拿到的月份是 0-11
  */
-function getNowDateTime() {
+function getNowDateTimeReadMode() {
     const now = new Date();
 
     const year = now.getFullYear();
@@ -16,9 +16,9 @@ function getNowDateTime() {
 }
 
 /**
- * 获取当前时间（yyyymmddhhmmss）
+ * 获取当前时间（数字模式，yyyyMMddHHmmss）
  */
-function getNowDateTimeV2() {
+function getNowDateTimeNumMode() {
     const now = new Date();
 
     const year = now.getFullYear();
@@ -31,4 +31,7 @@ function getNowDateTimeV2() {
     return `${year}${month}${day}${hours}${minutes}${seconds}`;
 }
 
-export { getNowDateTime, getNowDateTimeV2 };
+export default {
+    getNowDateTimeReadMode,
+    getNowDateTimeNumMode,
+};

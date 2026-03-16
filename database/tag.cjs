@@ -1,5 +1,5 @@
-const { config } = require('./config.cjs');
-const { logSqlLog } = require('../util/log.cjs');
+const  dbConfig  = require('./config.cjs');
+const utilLog = require('../util/log.cjs');
 
 let dbConn;
 
@@ -10,17 +10,17 @@ function dbSetDbConn(conn) {
 // 【tag 表】的模型
 const dbTagModelDefault = {
     id: 0,
-    name: config.dbTextDefaultValue,
-    description: config.dbTextDefaultValue,
-    create_at: config.dbTextDefaultValueNowTime,
-    update_at: config.dbTextDefaultValueNowTime,
+    name: dbConfig.textValueDefault,
+    description: dbConfig.textValueDefault,
+    createAt: dbConfig.textValueNowTime,
+    updateAt: dbConfig.textValueNowTime,
 };
 
 // 【resource_tag 表】的模型
 const dbResourceTagModelDefault = {
-    resource_id: 0,
-    tag_id: 0,
-    create_at: config.dbTextDefaultValueNowTime,
+    resourceId: 0,
+    tagId: 0,
+    createAt: dbConfig.textValueNowTime,
 };
 
 /**
@@ -28,16 +28,14 @@ const dbResourceTagModelDefault = {
  * @returns Promise<Array> 标签列表
  */
 function dbTagQueryAll() {
-    const thisFuncName = 'dbTagQueryAll';
-
     const sql = `SELECT * FROM \`tag\` ORDER BY id DESC`;
 
-    logSqlLog(thisFuncName, sql, [])
+    utilLog.fnLogSqlLog( sql, [])
 
     return new Promise((resolve, reject) => {
         dbConn.all(sql, [], (err, rows) => {
             if (err) {
-                console.error(thisFuncName, err.message);
+                utilLog.fnLogErrLog(err);
                 reject(err.message);
             } else {
                 resolve(rows || []);
@@ -52,20 +50,18 @@ function dbTagQueryAll() {
  * @returns Promise<Array> 标签列表
  */
 function dbResourceTagQuery(resourceId) {
-    const thisFuncName = 'dbResourceTagQuery';
-
     const sql = `SELECT t.* 
 FROM \`resource_tag\` AS rt INNER JOIN \`tag\` AS t ON rt.tag_id = t.id 
 WHERE rt.resource_id = ? 
 ORDER BY t.id DESC`;
     const valueList = [resourceId];
 
-    logSqlLog(thisFuncName, sql, valueList)
+    utilLog.fnLogSqlLog( sql, valueList)
 
     return new Promise((resolve, reject) => {
         dbConn.all(sql, valueList, (err, rows) => {
             if (err) {
-                console.error(thisFuncName, err.message);
+                utilLog.fnLogErrLog(err);
                 reject(err.message);
             } else {
                 if (rows == null) {
@@ -83,20 +79,18 @@ ORDER BY t.id DESC`;
  * @returns Promise<Object> 新创建的标签
  */
 function dbTagCreate(dbModel) {
-    const thisFuncName = 'dbTagCreate';
-
     const { name, description } = dbModel;
 
     const sql = `INSERT INTO tag (name, description, create_at, update_at) 
 VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
     const valueList = [name, description];
 
-    logSqlLog(thisFuncName, sql, valueList)
+    utilLog.fnLogSqlLog( sql, valueList)
 
     return new Promise((resolve, reject) => {
         dbConn.run(sql, valueList, function (err) {
             if (err) {
-                console.error(thisFuncName, err.message);
+                utilLog.fnLogErrLog(err);
                 reject(err.message);
             } else {
                 resolve({ id: this.lastID });
@@ -112,8 +106,6 @@ VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
  * @returns Promise<void>
  */
 function dbResourceTagSave(resourceId, tagIdList) {
-    const thisFuncName = 'dbResourceTagSave';
-
     return new Promise((resolve, reject) => {
         dbConn.serialize(() => {
             dbConn.run('BEGIN TRANSACTION');
@@ -122,12 +114,12 @@ function dbResourceTagSave(resourceId, tagIdList) {
             const delSql = `DELETE FROM \`resource_tag\` WHERE resource_id = ?`;
             const delValueList = [resourceId];
             
-            logSqlLog(thisFuncName, delSql, delValueList)
+            utilLog.fnLogSqlLog( delSql, delValueList)
 
             dbConn.run(delSql, delValueList, (err) => {
                 if (err != null) {
                     dbConn.run('ROLLBACK');
-                    console.error(thisFuncName, err.message);
+                    utilLog.fnLogErrLog(err);
                     reject(err.message);
                     return;
                 }
@@ -147,12 +139,12 @@ VALUES (?, ?, CURRENT_TIMESTAMP)`;
                 tagIdList.forEach((item) => {
                     const insertValueList = [resourceId, item];
 
-                    logSqlLog(thisFuncName, insertSql, insertValueList)
+                    utilLog.fnLogSqlLog( insertSql, insertValueList)
 
                     dbConn.run(insertSql, insertValueList, (err02) => {
                         if (err02 != null) {
                             dbConn.run('ROLLBACK');
-                            console.error(thisFuncName, err02.message);
+                            utilLog.fnLogErrLog(err02);
                             reject(err02.message);
                             return;
                         }
